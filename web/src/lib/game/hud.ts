@@ -9,76 +9,84 @@ const CSS = `
 #ornn-hud, #ornn-hud * { box-sizing: border-box; margin: 0; padding: 0; }
 #ornn-hud {
   position: fixed; inset: 0; pointer-events: none; z-index: 10;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   color: ${C.text};
+  line-height: 1.4; letter-spacing: 0.01em; word-spacing: 0.04em;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
-.oh-mono { font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.oh-mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 
-/* ---- header ---- */
-#oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 14px 20px 10px; }
-#oh-top { display: flex; align-items: center; justify-content: space-between; }
-#oh-brand { display: flex; align-items: center; gap: 9px; }
-#oh-brand svg { display: block; }
-#oh-brand .oh-word { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: ${C.text}; }
-#oh-lead { font-size: 13px; color: ${C.dim}; pointer-events: auto; cursor: default; }
+/* pixel-theme panel: square, 2px border, hard offset shadow */
+.oh-panel {
+  background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
+}
 
-#oh-tabs { display: flex; gap: 22px; margin-top: 14px; }
+/* ---- header (no top navbar; tabs + price only) ---- */
+#oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 18px 24px 12px; }
+#oh-tabs { display: flex; gap: 8px; }
 .oh-tab {
-  pointer-events: auto; cursor: pointer; background: none; border: none;
-  font-family: inherit; font-size: 13px; color: ${C.dim};
-  padding: 0 0 7px; position: relative; transition: color .12s;
+  pointer-events: auto; cursor: pointer;
+  background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
+  font-family: inherit; font-size: 13px; line-height: 1.4; color: ${C.dim};
+  padding: 6px 14px; transition: color .12s, border-color .12s;
 }
-.oh-tab:hover { color: #b8b8b8; }
-.oh-tab.active { color: ${C.text}; font-weight: 600; }
-.oh-tab.active::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: ${C.text};
-}
-#oh-tabline { height: 1px; background: ${C.grid}; margin: 0 -20px; }
+.oh-tab:hover { color: #c8c8c8; }
+.oh-tab.active { color: ${C.text}; font-weight: 600; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
+#oh-tabline { display: none; }
 
-#oh-priceblock { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
-#oh-price { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-#oh-price .oh-hr { font-size: 14px; font-weight: 400; color: ${C.dim}; margin-left: 4px; }
+#oh-priceblock { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 2px 0; }
+#oh-price { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
+#oh-price .oh-hr { font-size: 14px; font-weight: 400; color: ${C.dim}; margin-left: 6px; }
 #oh-change {
-  font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 5px;
-  font-variant-numeric: tabular-nums;
+  font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 0;
+  border: 2px solid transparent; font-variant-numeric: tabular-nums; line-height: 1.2;
 }
-#oh-change.up { color: ${C.chgUpText}; background: ${C.chgUpBg}; }
-#oh-change.down { color: ${C.chgDownText}; background: ${C.chgDownBg}; }
-#oh-ranges { display: flex; gap: 4px; margin-left: 4px; }
+#oh-change.up { color: ${C.chgUpText}; background: ${C.chgUpBg}; border-color: #1d4a2e; }
+#oh-change.down { color: ${C.chgDownText}; background: ${C.chgDownBg}; border-color: #4a231d; }
+#oh-ranges { display: flex; gap: 6px; margin-left: 6px; }
 .oh-pill {
-  pointer-events: auto; cursor: pointer; background: none; border: none;
+  pointer-events: auto; cursor: pointer; background: #0c0c0c;
+  border: 2px solid #262626; border-radius: 0;
   font-family: inherit; font-size: 12px; font-weight: 500; color: ${C.dim};
-  padding: 4px 10px; border-radius: 6px; transition: background .12s, color .12s;
+  padding: 5px 12px; line-height: 1.3; transition: background .12s, color .12s, border-color .12s;
 }
-.oh-pill:hover { color: #b8b8b8; }
-.oh-pill.active { color: ${C.text}; background: #1c1c1c; }
+.oh-pill:hover { color: #c8c8c8; }
+.oh-pill.active { color: #050505; background: ${C.text}; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
 .oh-hidden { display: none !important; }
 
-/* ---- in-run stats (minimal, bottom) ---- */
+/* ---- in-run stats ---- */
 #oh-stats {
-  position: absolute; left: 20px; bottom: 16px; display: flex; gap: 20px;
+  position: absolute; left: 24px; bottom: 20px; display: flex; gap: 12px;
 }
-#oh-stats .oh-stat { display: flex; flex-direction: column; gap: 2px; }
-#oh-stats .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; }
-#oh-stats .oh-v { font-size: 15px; color: ${C.text}; }
+#oh-stats .oh-stat {
+  display: flex; flex-direction: column; gap: 3px;
+  background: #0c0c0c; border: 2px solid #262626; padding: 8px 14px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
+}
+#oh-stats .oh-k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: ${C.dim}; line-height: 1.3; }
+#oh-stats .oh-v { font-size: 15px; color: ${C.text}; line-height: 1.25; }
 #oh-stats .oh-v.cred { color: ${C.amber}; }
-#oh-speed { position: absolute; right: 20px; bottom: 16px; text-align: right; }
-#oh-speed .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; }
-#oh-speed .oh-v { font-size: 18px; color: ${C.text}; }
+#oh-speed {
+  position: absolute; right: 24px; bottom: 20px; text-align: right;
+  background: #0c0c0c; border: 2px solid #262626; padding: 8px 14px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
+}
+#oh-speed .oh-k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: ${C.dim}; line-height: 1.3; }
+#oh-speed .oh-v { font-size: 18px; color: ${C.text}; line-height: 1.25; }
 #oh-speed .oh-v span { font-size: 11px; color: ${C.dim}; }
 
-/* ---- nitro meter (amber fill) + boost button ---- */
-#oh-nitro { position: absolute; right: 20px; bottom: 58px; width: 128px; }
-#oh-nitro .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; text-align: right; margin-bottom: 4px; }
-#oh-nitro .oh-track { height: 6px; border-radius: 3px; background: #1c1c1c; overflow: hidden; }
-#oh-nitro .oh-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, ${C.amber}, ${C.green}); transition: width .08s linear; }
-#oh-nitro.armed .oh-fill { box-shadow: 0 0 8px ${C.amber}; }
+/* ---- nitro meter + boost button ---- */
+#oh-nitro { position: absolute; right: 24px; bottom: 78px; width: 132px; }
+#oh-nitro .oh-k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: ${C.dim}; text-align: right; margin-bottom: 5px; line-height: 1.3; }
+#oh-nitro .oh-track { height: 8px; border-radius: 0; background: #0c0c0c; border: 2px solid #262626; overflow: hidden; }
+#oh-nitro .oh-fill { height: 100%; width: 0%; border-radius: 0; background: ${C.amber}; transition: width .08s linear; image-rendering: pixelated; }
+#oh-nitro.armed .oh-fill { background: ${C.green}; }
 #oh-nitrobtn {
-  position: absolute; right: 20px; bottom: 96px; pointer-events: auto; cursor: pointer;
-  width: 68px; height: 68px; border-radius: 50%; border: 1.5px solid #2a2a2a;
-  background: radial-gradient(circle at 50% 40%, #191207, #0c0c0c);
+  position: absolute; right: 24px; bottom: 118px; pointer-events: auto; cursor: pointer;
+  width: 68px; height: 68px; border-radius: 0; border: 2px solid #2a2a2a;
+  background: #0c0c0c; box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
   color: ${C.amber}; font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
   display: none; align-items: center; justify-content: center; user-select: none;
   transition: filter .1s, border-color .1s;
@@ -86,11 +94,11 @@ const CSS = `
 #oh-nitrobtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
 @media (pointer: coarse) { #oh-nitrobtn { display: flex; } }
 #oh-hint {
-  position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-  font-size: 12px; color: ${C.dim}; letter-spacing: 0.04em;
-  transition: opacity .3s; text-align: center;
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  font-size: 12px; color: ${C.dim}; letter-spacing: 0.05em; line-height: 1.5;
+  padding: 6px 12px; transition: opacity .3s; text-align: center;
 }
-#oh-hint b { color: ${C.text}; background: #161616; border-radius: 4px; padding: 2px 6px; margin: 0 1px; }
+#oh-hint b { color: ${C.text}; background: #161616; border: 1px solid #2a2a2a; border-radius: 0; padding: 3px 7px; margin: 0 2px; }
 
 /* ---- results ---- */
 #oh-results {
@@ -98,44 +106,38 @@ const CSS = `
   pointer-events: auto; background: rgba(5,5,5,0.72);
 }
 .oh-rescard {
-  width: 320px; background: ${C.panel}; border-radius: 14px; padding: 24px 26px; text-align: center;
+  width: 340px; background: ${C.panel}; border: 2px solid #2e2e2e; border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.7); padding: 26px 28px; text-align: center;
 }
-.oh-restitle { font-size: 15px; font-weight: 600; letter-spacing: 0.14em; margin-bottom: 16px; }
+.oh-restitle { font-size: 16px; font-weight: 700; letter-spacing: 0.16em; line-height: 1.3; margin-bottom: 18px; }
 .oh-restitle.crashed { color: ${C.chgDownText}; }
 .oh-restitle.finished { color: ${C.chgUpText}; }
-.oh-resgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.oh-rescell { background: #111; border-radius: 8px; padding: 12px; }
-.oh-rescell .oh-k { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: ${C.dim}; }
-.oh-rescell .oh-v { font-size: 18px; font-weight: 600; margin-top: 4px; }
-.oh-newbest { font-size: 11px; color: ${C.amber}; letter-spacing: 0.1em; margin-bottom: 12px; min-height: 14px; }
+.oh-resgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.oh-rescell { background: #111; border: 2px solid #222; border-radius: 0; padding: 12px 14px; }
+.oh-rescell .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; line-height: 1.3; }
+.oh-rescell .oh-v { font-size: 18px; font-weight: 600; margin-top: 5px; line-height: 1.25; }
+.oh-newbest { font-size: 11px; color: ${C.amber}; letter-spacing: 0.12em; margin-bottom: 14px; min-height: 15px; line-height: 1.3; }
 .oh-btnrow { display: flex; gap: 10px; }
 .oh-btn {
-  flex: 1; font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: 0.06em;
-  padding: 10px 0; border-radius: 8px; cursor: pointer; border: none; transition: filter .12s;
+  flex: 1; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 1.3;
+  padding: 11px 0; border-radius: 0; cursor: pointer; border: 2px solid transparent; transition: filter .12s;
 }
 .oh-btn:hover { filter: brightness(1.25); }
-.oh-btn.primary { background: ${C.text}; color: ${C.chipText}; }
-.oh-btn.ghost { background: #1c1c1c; color: ${C.dim}; }
+.oh-btn.primary { background: ${C.text}; color: ${C.chipText}; box-shadow: 3px 3px 0 rgba(0,0,0,0.7); }
+.oh-btn.ghost { background: #1c1c1c; color: ${C.dim}; border-color: #2a2a2a; }
 
 /* ---- loading ---- */
 #oh-loading {
   position: absolute; left: 50%; top: 55%; transform: translate(-50%,-50%);
-  font-size: 13px; letter-spacing: 0.06em; color: ${C.dim};
-  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; letter-spacing: 0.06em; line-height: 1.4; color: ${C.dim};
+  padding: 10px 16px; display: flex; align-items: center; gap: 10px;
 }
 #oh-loading .oh-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: ${C.text};
-  animation: oh-pulse 0.9s ease-in-out infinite;
+  width: 8px; height: 8px; border-radius: 0; background: ${C.text};
+  animation: oh-pulse 0.9s steps(2, end) infinite;
 }
 @keyframes oh-pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 1; } }
 `
-
-// Layered-diamond Ornn glyph, white.
-const LOGO_SVG = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M10 1.5 18 6 10 10.5 2 6 10 1.5Z" fill="#fff" opacity="0.95"/>
-  <path d="M2 10 10 14.5 18 10" stroke="#fff" stroke-width="1.4" opacity="0.6"/>
-  <path d="M2 13.6 10 18 18 13.6" stroke="#fff" stroke-width="1.4" opacity="0.32"/>
-</svg>`
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, html?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag)
@@ -172,10 +174,6 @@ export function createHud(
   const header = el('div', '')
   header.id = 'oh-header'
   header.innerHTML = `
-    <div id="oh-top">
-      <div id="oh-brand">${LOGO_SVG}<span class="oh-word">Ornn</span></div>
-      <div id="oh-lead">Leaderboard (soon)</div>
-    </div>
     <div id="oh-tabs"></div>
     <div id="oh-tabline"></div>
     <div id="oh-priceblock">

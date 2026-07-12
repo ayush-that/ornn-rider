@@ -185,7 +185,7 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
     // canvas handles touch halves — disable Phaser's keyboard capture.
     input: { keyboard: false, mouse: true, touch: true },
     audio: { noAudio: true }, // WebAudio synth lives in audio.ts
-    render: { antialias: true, powerPreference: 'high-performance' },
+    render: { pixelArt: true, powerPreference: 'high-performance' },
     scene,
   })
 
