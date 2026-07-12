@@ -772,7 +772,19 @@ export class OrnnScene extends Phaser.Scene {
     this.grounded = this.contacts > 0
     this._speed = this.chassis.speed * 60
     this._rpm = Math.min(Math.abs(this.wheelBack.angularVelocity) / MAX_WHEEL_AV, 1)
-    if (this.headHit) this.crashed = true
+    if (this.headHit) {
+      // Only a real wipeout kills: head contact while the bike is pitched past
+      // ~52 deg. A nose-down landing that grazes the helmet is a scrape, not a
+      // crash — instant deaths on ordinary jumps read as unfair.
+      const a2p = this.chassis.angle % (Math.PI * 2)
+      const norm = a2p > Math.PI ? a2p - Math.PI * 2 : a2p < -Math.PI ? a2p + Math.PI * 2 : a2p
+      if (Math.abs(norm) > 0.9) {
+        this.crashed = true
+      } else {
+        this.headHit = false
+        this.addShake(2)
+      }
+    }
     // keep the read-only view (hud + debug handle) live
     const v = this.bikeView
     v.chassis.position.x = this.chassis.position.x
