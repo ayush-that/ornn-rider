@@ -522,7 +522,7 @@ export class OrnnScene extends Phaser.Scene {
 
     const susp = (wheel: Body, ax: number) => this.matter.constraint.create({
       bodyA: this.chassis, pointA: { x: ax, y: 0 }, bodyB: wheel, pointB: { x: 0, y: 0 },
-      stiffness: 0.4, damping: 0.16,
+      stiffness: 0.62, damping: 0.2,
     })
     const head = (px: number) => this.matter.constraint.create({
       bodyA: this.chassis, pointA: { x: px, y: -8 }, bodyB: this.riderHead, pointB: { x: 0, y: 0 },
@@ -749,6 +749,10 @@ export class OrnnScene extends Phaser.Scene {
     for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
       if (b.velocity.y > MAX_FALL) this.matter.body.setVelocity(b, { x: b.velocity.x, y: MAX_FALL })
     }
+    // Bump stops are slam protection only. During flips the wheels orbit the
+    // chassis and the solver legitimately lags several px — correcting then
+    // teleports wheels mid-rotation and blows the bike apart.
+    if (Math.abs(this.chassis.angularVelocity) > 0.12) return
     const a = this.chassis.angle
     const cos = Math.cos(a)
     const sin = Math.sin(a)
@@ -756,8 +760,8 @@ export class OrnnScene extends Phaser.Scene {
     // Generous travel so normal suspension work never triggers a correction
     // (hard 26px stops fired constantly on jagged terrain = visible jitter).
     // Within the soft band, ease back; only a true blow-out gets snapped.
-    const MAX_TRAVEL = 42
-    const SNAP = 70
+    const MAX_TRAVEL = 20
+    const SNAP = 55
     const fix = (wheel: Body, dx: number): void => {
       const sx = p.x + cos * dx - sin * WHEEL_DY
       const sy = p.y + sin * dx + cos * WHEEL_DY
@@ -769,10 +773,15 @@ export class OrnnScene extends Phaser.Scene {
       if (d > SNAP) {
         const k = MAX_TRAVEL / d
         this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
-        this.matter.body.setVelocity(wheel, { x: this.chassis.velocity.x, y: this.chassis.velocity.y })
+        // damp toward chassis velocity instead of overwriting — a hard
+        // velocity reset mid-motion injects constraint-fighting energy
+        this.matter.body.setVelocity(wheel, {
+          x: (wheel.velocity.x + this.chassis.velocity.x) * 0.5,
+          y: (wheel.velocity.y + this.chassis.velocity.y) * 0.5,
+        })
       } else {
         // soft: ease 25% of the excess back per frame, no velocity touch
-        const k = 1 - 0.25 * (1 - MAX_TRAVEL / d)
+        const k = 1 - 0.35 * (1 - MAX_TRAVEL / d)
         this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
       }
     }
