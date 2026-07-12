@@ -68,6 +68,23 @@ const CSS = `
 #oh-speed .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; }
 #oh-speed .oh-v { font-size: 18px; color: ${C.text}; }
 #oh-speed .oh-v span { font-size: 11px; color: ${C.dim}; }
+
+/* ---- nitro meter (amber fill) + boost button ---- */
+#oh-nitro { position: absolute; right: 20px; bottom: 58px; width: 128px; }
+#oh-nitro .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; text-align: right; margin-bottom: 4px; }
+#oh-nitro .oh-track { height: 6px; border-radius: 3px; background: #1c1c1c; overflow: hidden; }
+#oh-nitro .oh-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, ${C.amber}, ${C.green}); transition: width .08s linear; }
+#oh-nitro.armed .oh-fill { box-shadow: 0 0 8px ${C.amber}; }
+#oh-nitrobtn {
+  position: absolute; right: 20px; bottom: 96px; pointer-events: auto; cursor: pointer;
+  width: 68px; height: 68px; border-radius: 50%; border: 1.5px solid #2a2a2a;
+  background: radial-gradient(circle at 50% 40%, #191207, #0c0c0c);
+  color: ${C.amber}; font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  display: none; align-items: center; justify-content: center; user-select: none;
+  transition: filter .1s, border-color .1s;
+}
+#oh-nitrobtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
+@media (pointer: coarse) { #oh-nitrobtn { display: flex; } }
 #oh-hint {
   position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
   font-size: 12px; color: ${C.dim}; letter-spacing: 0.04em;
@@ -135,6 +152,7 @@ export function createHud(
   root: HTMLElement,
   tracks: Track[],
   onSelect: (track: Track, range: GpuRange) => void,
+  onNitro?: (active: boolean) => void,
 ) {
   if (!document.getElementById('ornn-hud-style')) {
     const style = document.createElement('style')
@@ -234,10 +252,28 @@ export function createHud(
 
   const hint = el('div', '')
   hint.id = 'oh-hint'
-  hint.innerHTML = 'Press <b>→</b> to ride'
+  hint.innerHTML = 'Press <b>→</b> to ride · <b>Shift</b> nitro'
+
+  // Nitro meter (amber fill) + a touch boost button for coarse pointers.
+  const nitro = el('div', '')
+  nitro.id = 'oh-nitro'
+  nitro.innerHTML = `<div class="oh-k">Nitro</div><div class="oh-track"><div class="oh-fill"></div></div>`
+  const nitroFill = nitro.querySelector<HTMLElement>('.oh-fill')!
+
+  const nitroBtn = el('button', '')
+  nitroBtn.id = 'oh-nitrobtn'
+  nitroBtn.type = 'button'
+  nitroBtn.textContent = 'NITRO'
+  const pressNitro = (on: boolean) => (e: Event) => { e.preventDefault(); onNitro?.(on) }
+  nitroBtn.addEventListener('pointerdown', pressNitro(true))
+  nitroBtn.addEventListener('pointerup', pressNitro(false))
+  nitroBtn.addEventListener('pointercancel', pressNitro(false))
+  nitroBtn.addEventListener('pointerleave', pressNitro(false))
 
   hud.appendChild(stats)
   hud.appendChild(speed)
+  hud.appendChild(nitro)
+  hud.appendChild(nitroBtn)
   hud.appendChild(hint)
 
   // ---- results + loading ----
@@ -252,6 +288,7 @@ export function createHud(
 
   // dirty-check caches
   let lastDist = -1, lastCred = -1, lastBest = -1, lastSpeed = -1, hintHidden = false
+  let lastNitro = -1, lastArmed = false
 
   function update(state: GameState): void {
     if (!state.terrain || !state.bike) return
@@ -266,6 +303,15 @@ export function createHud(
     if (best !== lastBest) { lastBest = best; sBest.textContent = fmtBest(best) }
     const spd = Math.round(state.bike.speed * 0.36)
     if (spd !== lastSpeed) { lastSpeed = spd; sSpeedText.nodeValue = `${spd} ` }
+
+    // Nitro meter fill; "armed" glow while boosting.
+    const np = Math.round(state.nitro * 100)
+    if (np !== lastNitro) { lastNitro = np; nitroFill.style.width = `${np}%` }
+    if (state.nitroActive !== lastArmed) {
+      lastArmed = state.nitroActive
+      nitro.classList.toggle('armed', state.nitroActive)
+      nitroBtn.classList.toggle('armed', state.nitroActive)
+    }
   }
 
   function showResults(state: GameState, onRetry: () => void): void {

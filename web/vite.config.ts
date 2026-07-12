@@ -120,6 +120,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Allow sharing the dev server through ngrok tunnels.
+    allowedHosts: [".ngrok-free.dev", ".ngrok.app"],
   },
   plugins: lazyPlugins(() => [
     devtools({

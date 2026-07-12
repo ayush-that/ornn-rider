@@ -1,5 +1,6 @@
-// Shared contract for all modules. Do not change signatures without updating BUILD_SPEC.md.
-import type { Body, Engine } from 'matter-js'
+// Shared contract for all modules. Physics + rendering now live in Phaser
+// (scene.ts); this file stays framework-agnostic so data.ts / terrain.ts /
+// hud.ts keep compiling without importing Phaser or matter-js.
 
 export interface SeriesPoint {
   t: number // unix ms
@@ -20,7 +21,7 @@ export interface Track {
 
 export interface TerrainPoint {
   x: number
-  y: number // canvas/world coords, +y down
+  y: number // world coords, +y down
 }
 
 export interface DayMarker {
@@ -45,41 +46,18 @@ export interface Terrain {
   slopeAt(x: number): number
 }
 
-export interface Bike {
-  chassis: Body
-  wheelBack: Body
-  wheelFront: Body
-  riderHead: Body
-  allBodies: Body[]
-  throttle(dir: -1 | 0 | 1): void // 1 = forward, -1 = brake/reverse
-  lean(dir: -1 | 0 | 1): void // in-air rotation
-  readonly speed: number // m/s along ground, px/s fine
-  readonly rpm: number // 0..1 normalized for audio/fx
-  readonly grounded: boolean
-  readonly crashed: boolean // head touched ground
-  update(dtMs: number): void
-  reset(x: number, y: number): void
-}
-
 export type GamePhase = 'menu' | 'loading' | 'playing' | 'crashed' | 'finished'
 
-export interface Particle {
-  x: number; y: number; vx: number; vy: number
-  life: number; maxLife: number
-  size: number; color: string
-  glow?: boolean
-}
-
-export interface Effects {
-  particles: Particle[]
-  shake: { x: number; y: number }
-  emitDust(x: number, y: number, intensity: number): void
-  emitBoost(x: number, y: number): void // green bull-run trail
-  emitEmbers(x: number, y: number): void // red drawdown embers
-  emitCrash(x: number, y: number): void
-  emitPickup(x: number, y: number): void
-  addShake(mag: number): void
-  update(dt: number): void
+// Read-only view of the Phaser/Matter bike that hud.ts and the debug handle
+// consume without depending on Phaser types. scene.ts keeps this in sync each
+// frame from the live Matter bodies.
+export interface BikeView {
+  chassis: { position: { x: number; y: number }; angle: number }
+  readonly speed: number // px/s along ground
+  readonly rpm: number // 0..1 normalized for audio/fx
+  grounded: boolean
+  crashed: boolean // head touched ground
+  ejected: boolean // ragdoll thrown from the bike
 }
 
 export interface GameState {
@@ -90,19 +68,19 @@ export interface GameState {
   latestChangePct: number // day-over-day change of the latest value (header ticker)
   track: Track | null
   terrain: Terrain | null
-  bike: Bike | null
-  engine: Engine | null
-  effects: Effects
+  bike: BikeView | null
   camera: { x: number; y: number; zoom: number }
   distance: number // px progressed
   credits: number // collected day-marker coins
   airTimeMs: number
   flips: number
   bestDistance: Record<string, number> // per track id, localStorage-backed
-  collected: Uint8Array | null // per-day-marker pickup state, render reads it
+  collected: Uint8Array | null // per-day-marker pickup state
   newBest: boolean // last run beat the stored best (set when the run ends)
   trend: number // -1..1 smoothed recent price direction, drives fx/wind
   timeMs: number
+  nitro: number // 0..1 boost charge
+  nitroActive: boolean // boost currently firing
 }
 
 // Palette — Ornn live-chart theme: pure black, white price line, chart-paper
@@ -129,4 +107,25 @@ export const C = {
   red: '#f05e51', // bear effects
   amber: '#f5a524', // credit coins
   glow: 'rgba(52,217,123,0.35)',
+} as const
+
+// Numeric mirrors of the palette for Phaser (which takes 0xRRGGBB ints).
+export const CN = {
+  bg0: 0x050505,
+  panel: 0x1c1c1c,
+  grid: 0x161616,
+  gridBright: 0x1e1e1e,
+  chart: 0xf5f5f5,
+  text: 0xffffff,
+  dim: 0x8a8a8a,
+  axis: 0x6a6a6a,
+  chipBg: 0xffffff,
+  depth: 0x0a0a0a, // faint terrain depth fill
+  green: 0x34d97b,
+  greenDim: 0x1d7a4a,
+  greenBright: 0x7ff0ad,
+  red: 0xf05e51,
+  amber: 0xf5a524,
+  amberBright: 0xff8a5c,
+  dust: 0x8f9c8a,
 } as const
