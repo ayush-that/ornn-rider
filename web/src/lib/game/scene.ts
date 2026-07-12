@@ -243,6 +243,7 @@ export class OrnnScene extends Phaser.Scene {
   private collectIdx = 0
   private trendIdx = 0
   private prevGrounded = true
+  private curAirMs = 0 // continuous current-air duration (resets on landing)
   private airMaxVy = 0
   private flipAccum = 0
   private pendingFlips = 0
@@ -721,9 +722,11 @@ export class OrnnScene extends Phaser.Scene {
     if (!grounded) {
       if (this.prevGrounded) { this.airMaxVy = 0; this.flipAccum = 0; this.pendingFlips = 0 }
       state.airTimeMs += STEP
+      this.curAirMs += STEP
       if (preVy > this.airMaxVy) this.airMaxVy = preVy
-    } else if (!this.prevGrounded) {
-      this.onLanding()
+    } else {
+      if (!this.prevGrounded) this.onLanding()
+      this.curAirMs = 0
     }
     this.prevGrounded = grounded
 
@@ -750,17 +753,27 @@ export class OrnnScene extends Phaser.Scene {
     const cos = Math.cos(a)
     const sin = Math.sin(a)
     const p = this.chassis.position
-    const MAX_TRAVEL = 26 // max distance a wheel may sit from its socket
+    // Generous travel so normal suspension work never triggers a correction
+    // (hard 26px stops fired constantly on jagged terrain = visible jitter).
+    // Within the soft band, ease back; only a true blow-out gets snapped.
+    const MAX_TRAVEL = 42
+    const SNAP = 70
     const fix = (wheel: Body, dx: number): void => {
       const sx = p.x + cos * dx - sin * WHEEL_DY
       const sy = p.y + sin * dx + cos * WHEEL_DY
       const ex = wheel.position.x - sx
       const ey = wheel.position.y - sy
       const d2 = ex * ex + ey * ey
-      if (d2 > MAX_TRAVEL * MAX_TRAVEL) {
-        const k = MAX_TRAVEL / Math.sqrt(d2)
+      if (d2 <= MAX_TRAVEL * MAX_TRAVEL) return
+      const d = Math.sqrt(d2)
+      if (d > SNAP) {
+        const k = MAX_TRAVEL / d
         this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
         this.matter.body.setVelocity(wheel, { x: this.chassis.velocity.x, y: this.chassis.velocity.y })
+      } else {
+        // soft: ease 25% of the excess back per frame, no velocity touch
+        const k = 1 - 0.25 * (1 - MAX_TRAVEL / d)
+        this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
       }
     }
     fix(this.wheelBack, BACK_DX)
@@ -1001,8 +1014,9 @@ export class OrnnScene extends Phaser.Scene {
       targetZoom = 1.1 // idle at the start line
     } else {
       targetZoom = 1.0 - (Math.min(spd, 1400) / 1400) * 0.18
-      if (!this.grounded && state.terrain) {
-        // height above ground -> up to -0.2 extra zoom-out on big air
+      // Only sustained air widens the view — the grounded flag flickers over
+      // jagged vertices and reacting to it makes the zoom pump.
+      if (!this.grounded && this.curAirMs > 250 && state.terrain) {
         const h = state.terrain.groundY(p.x) - p.y
         if (h > 80) targetZoom -= Math.min((h - 80) / 900, 1) * 0.2
       }
