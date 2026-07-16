@@ -5,6 +5,7 @@
 // to avoid clicks and self-disconnects on `ended` so nothing hangs.
 export interface Audio {
   setEngine(rpm: number, on: boolean): void
+  setMusic(on: boolean): void
   thud(mag: number): void
   ping(): void
   coin(): void
@@ -168,6 +169,49 @@ export function createAudio(): Audio {
     engineGain = null
   }
 
+  // --- background music: light generative pentatonic loop -------------------
+  // A-minor pentatonic over a soft drone; long sine envelopes through a fixed
+  // lowpass at a whisper (~0.05 into master). Pattern-based, no randomness.
+  let musicTimer: ReturnType<typeof setInterval> | null = null
+  let musicBus: GainNode | null = null
+  let musicNext = 0
+  let musicStep = 0
+  const MUSIC_NOTES = [220, 261.63, 293.66, 329.63, 392, 440] // A3 C4 D4 E4 G4 A4
+  const MUSIC_PAT = [0, -1, 2, -1, 4, -1, 3, -1, 5, -1, 2, -1, 4, 1, -1, -1]
+  const MUSIC_BEAT = 0.85 // seconds per pattern step
+
+  function musicNote(freq: number, when: number, dur: number, peak: number): void {
+    const ctx = getAudioContext()
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0, when)
+    g.gain.linearRampToValueAtTime(peak, when + dur * 0.25)
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur)
+    osc.connect(g)
+    g.connect(musicBus!)
+    osc.onended = () => {
+      osc.disconnect()
+      g.disconnect()
+    }
+    osc.start(when)
+    osc.stop(when + dur + 0.05)
+  }
+
+  function stopMusic(): void {
+    if (musicTimer !== null) {
+      clearInterval(musicTimer)
+      musicTimer = null
+    }
+    if (musicBus && audioCtx) {
+      const bus = musicBus
+      bus.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3)
+      setTimeout(() => bus.disconnect(), 1500)
+      musicBus = null
+    }
+  }
+
   // --- boost: single rising filtered saw sweep, fadeable on stop ------------
   let boostUntil = 0
   let boostOsc: OscillatorNode | null = null
@@ -184,12 +228,12 @@ export function createAudio(): Audio {
       const now = ctx.currentTime
       if (!engineOsc) {
         engineOsc = ctx.createOscillator()
-        engineOsc.type = 'sawtooth'
+        engineOsc.type = 'triangle'
         engineSub = ctx.createOscillator()
-        engineSub.type = 'square'
+        engineSub.type = 'sine'
         engineFilter = ctx.createBiquadFilter()
         engineFilter.type = 'lowpass'
-        engineFilter.Q.value = 6
+        engineFilter.Q.value = 1.1
         engineGain = ctx.createGain()
         engineGain.gain.value = 0
         engineOsc.connect(engineFilter)
@@ -199,12 +243,40 @@ export function createAudio(): Audio {
         engineOsc.start()
         engineSub.start()
       }
-      // rpm 0..1 -> fundamental 40..140Hz, lowpass 300..2200Hz, gain 0.05..0.34
-      const base = 40 + rpm * 100
+      // Soft hum, not a rasp: triangle + sine sub through a gentle lowpass.
+      // rpm 0..1 -> fundamental 50..130Hz, lowpass 220..1000Hz, gain 0.04..0.2
+      const base = 50 + rpm * 80
       engineOsc.frequency.setTargetAtTime(base, now, 0.06)
       engineSub!.frequency.setTargetAtTime(base * 0.5, now, 0.06)
-      engineFilter!.frequency.setTargetAtTime(300 + rpm * 1900, now, 0.06)
-      engineGain!.gain.setTargetAtTime(0.05 + rpm * 0.29, now, 0.05)
+      engineFilter!.frequency.setTargetAtTime(220 + rpm * 780, now, 0.06)
+      engineGain!.gain.setTargetAtTime(0.04 + rpm * 0.16, now, 0.05)
+    },
+
+    setMusic(on: boolean) {
+      if (!on) {
+        stopMusic()
+        return
+      }
+      if (musicTimer !== null) return // already playing
+      const ctx = getAudioContext()
+      musicBus = ctx.createGain()
+      musicBus.gain.value = 0.055
+      musicBus.connect(getMaster())
+      musicNext = ctx.currentTime + 0.1
+      musicStep = 0
+      // Lookahead scheduler: top up ~1.5s of notes every 400ms.
+      musicTimer = setInterval(() => {
+        if (!musicBus) return
+        const now = getAudioContext().currentTime
+        while (musicNext < now + 1.5) {
+          const idx = MUSIC_PAT[musicStep % MUSIC_PAT.length]
+          if (idx >= 0) musicNote(MUSIC_NOTES[idx], musicNext, 2.2, 1)
+          // low drone once per pattern pass, quiet and long
+          if (musicStep % MUSIC_PAT.length === 0) musicNote(110, musicNext, MUSIC_BEAT * 16, 0.55)
+          musicStep++
+          musicNext += MUSIC_BEAT
+        }
+      }, 400)
     },
 
     thud(mag: number) {
