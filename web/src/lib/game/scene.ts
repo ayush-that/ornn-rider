@@ -746,13 +746,12 @@ export class OrnnScene extends Phaser.Scene {
   // the bike assembled no matter how hard it smashes down.
   private enforceBikeIntegrity(): void {
     const MAX_FALL = 26 // px/step terminal velocity
+    const MAX_HORIZ = 40 // px/step terminal horizontal speed
     for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
-      if (b.velocity.y > MAX_FALL) this.matter.body.setVelocity(b, { x: b.velocity.x, y: MAX_FALL })
+      const vx = clamp(b.velocity.x, -MAX_HORIZ, MAX_HORIZ)
+      const vy = Math.min(b.velocity.y, MAX_FALL)
+      if (vx !== b.velocity.x || vy !== b.velocity.y) this.matter.body.setVelocity(b, { x: vx, y: vy })
     }
-    // Bump stops are slam protection only. During flips the wheels orbit the
-    // chassis and the solver legitimately lags several px — correcting then
-    // teleports wheels mid-rotation and blows the bike apart.
-    if (Math.abs(this.chassis.angularVelocity) > 0.12) return
     const a = this.chassis.angle
     const cos = Math.cos(a)
     const sin = Math.sin(a)
@@ -780,7 +779,10 @@ export class OrnnScene extends Phaser.Scene {
           y: (wheel.velocity.y + this.chassis.velocity.y) * 0.5,
         })
       } else {
-        // soft: ease 25% of the excess back per frame, no velocity touch
+        // Soft ease of the excess, position only. Runs during flips too — the
+        // socket target rotates with the chassis so gentle easing follows the
+        // spin instead of fighting it (crash tumbles previously scattered the
+        // wheels because correction was disabled whenever the bike rotated).
         const k = 1 - 0.35 * (1 - MAX_TRAVEL / d)
         this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
       }
@@ -1142,15 +1144,8 @@ export class OrnnScene extends Phaser.Scene {
       g.lineBetween(m.x, top, m.x, bottom)
     }
 
-    // horizontal price-level grid lines (labels drawn in chrome)
-    if (this.axis) {
-      g.lineStyle(1 / zoom, CN.grid, 1)
-      for (let i = 0; i < this.axis.levelY.length; i++) {
-        const y = this.axis.levelY[i]
-        if (y < top || y > bottom) continue
-        g.lineBetween(left, y, right - 64 / zoom, y)
-      }
-    }
+    // (horizontal price-level lines are chrome now — drawn zoom-independent
+    // in drawChrome so the right-axis numbers never move with dynamic zoom)
 
     // terrain: faint depth fill + crisp white jagged line
     const pts = t.points
@@ -1185,16 +1180,22 @@ export class OrnnScene extends Phaser.Scene {
     const h = this.scale.height
     const sx = (wx: number): number => (wx - wv.x) * zoom
     const sy = (wy: number): number => (wy - wv.y) * zoom
+    // Axis mapping at FIXED zoom: the price axis (level lines, labels, chip)
+    // tracks the camera's vertical pan but ignores dynamic zoom, so the
+    // numbers on the right stay put during nitro/air/crash zoom punches.
+    const syA = (wy: number): number => h / 2 + (wy - cam.midPoint.y)
 
     const g = this.chromeGfx
     g.clear()
 
-    // right-edge axis labels
+    // horizontal price-level grid lines + right-edge labels (fixed-zoom chrome)
     let ai = 0
     if (this.axis) {
       for (let i = 0; i < this.axis.levelY.length; i++) {
-        const py = sy(this.axis.levelY[i])
+        const py = syA(this.axis.levelY[i])
         if (py < 60 || py > h - 30) continue
+        g.lineStyle(1, CN.grid, 1)
+        g.lineBetween(0, py, w - 64, py)
         const txt = this.axisTexts[ai++]
         if (!txt) break
         txt.setVisible(true).setText(fmtAxis(this.axis.levelV[i])).setPosition(w - 10, py)
@@ -1226,7 +1227,7 @@ export class OrnnScene extends Phaser.Scene {
 
     // current-price chip + dotted level line at the bike price
     const wy = t.groundY(bikeX)
-    const chipY = sy(wy)
+    const chipY = syA(wy) // fixed-zoom axis mapping, aligned with the labels
     if (chipY > 40 && chipY < h - 20) {
       const price = priceAtX(t.markers, bikeX)
       // dotted horizontal line
