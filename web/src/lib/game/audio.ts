@@ -8,6 +8,7 @@ export interface Audio {
   coin(): void
   crash(): void
   boost(): void
+  boostStop(): void
   finish(): void
 }
 
@@ -111,6 +112,8 @@ export function createAudio(): Audio {
 
   // --- boost: at most one whoosh at a time, faded out on retrigger overlap --
   let boostUntil = 0
+  let boostSrc: AudioBufferSourceNode | null = null
+  let boostGain: GainNode | null = null
 
   return {
     setEngine(rpm: number, on: boolean) {
@@ -159,11 +162,43 @@ export function createAudio(): Audio {
       const ctx = audioCtx
       const now = ctx ? ctx.currentTime : 0
       if (now < boostUntil) return // still whooshing, don't stack
-      const src = play('boost', 0.45, 1.15)
-      if (src && ctx) {
-        boostUntil = now + 2 // sample is 5s; cut it short to match the tank
-        src.stop(now + 2)
+      const buf = buffers.boost
+      if (!buf || !ctx) {
+        loadBuffers()
+        return
       }
+      // Own gain chain so boostStop() can fade instead of hard-cutting.
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.playbackRate.value = 1.15
+      const g = ctx.createGain()
+      g.gain.value = 0.45
+      src.connect(g)
+      g.connect(getMaster())
+      src.start()
+      boostUntil = now + 2 // sample is 5s; cut it short to match the tank
+      src.stop(now + 2)
+      boostSrc = src
+      boostGain = g
+    },
+
+    // Cuts the whoosh the moment the boost ends (shift released / tank empty)
+    // with a short fade so it doesn't click.
+    boostStop() {
+      if (!boostSrc || !audioCtx) return
+      const t = audioCtx.currentTime
+      if (boostGain) {
+        boostGain.gain.setValueAtTime(boostGain.gain.value, t)
+        boostGain.gain.linearRampToValueAtTime(0, t + 0.1)
+      }
+      try {
+        boostSrc.stop(t + 0.12)
+      } catch {
+        /* already stopped */
+      }
+      boostSrc = null
+      boostGain = null
+      boostUntil = 0
     },
 
     finish() {

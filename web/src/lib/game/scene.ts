@@ -737,6 +737,11 @@ export class OrnnScene extends Phaser.Scene {
       this.lean(0)
       state.nitroActive = false
       this.nitroLatch = false
+      // Leaving 'playing' (crash/finish/menu) mid-boost: cut the whoosh.
+      if (this.prevNitroActive) {
+        this.prevNitroActive = false
+        this.ctx.audio.boostStop()
+      }
     }
 
     const preVy = Math.max(this.wheelBack.velocity.y, this.wheelFront.velocity.y)
@@ -899,6 +904,8 @@ export class OrnnScene extends Phaser.Scene {
       this.addShake(1.4)
       if (!this.prevNitroActive && !this.ctx.isMuted()) this.ctx.audio.boost()
     } else {
+      // Boost just ended (shift released or tank empty): kill the whoosh too.
+      if (this.prevNitroActive) this.ctx.audio.boostStop()
       // Idle recharge (trickle) only when not boosting.
       state.nitro = clamp(state.nitro + NITRO_TRICKLE * dtS, 0, 1)
     }
