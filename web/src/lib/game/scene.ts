@@ -204,7 +204,11 @@ export class OrnnScene extends Phaser.Scene {
   private ragdollSprite!: Phaser.GameObjects.Image
   private wheelBackSprite!: Phaser.GameObjects.Image
   private wheelFrontSprite!: Phaser.GameObjects.Image
-  private coinSprites: Phaser.GameObjects.Image[] = []
+  private coinSprites: (Phaser.GameObjects.Image | null)[] = []
+  // Per-marker pickup: 0 = none, >0 = points value, -1 = nitro canister.
+  private pickupValue = new Int16Array(0)
+  // floating "+20 / FRONTFLIP" popup pool
+  private popTexts: Phaser.GameObjects.Text[] = []
   private flagSprite: Phaser.GameObjects.Image | null = null
 
   // particle emitters
@@ -257,6 +261,7 @@ export class OrnnScene extends Phaser.Scene {
   private airMaxVy = 0
   private flipAccum = 0
   private pendingFlips = 0
+  private lastFlipDir = 1
   private lastAngle = 0
   private resultsShown = false
   private outcomeAt = 0
@@ -445,8 +450,9 @@ export class OrnnScene extends Phaser.Scene {
     this.bikeBodies = []
     if (this.ragdoll) { this.matter.world.remove(this.ragdoll); this.ragdoll = null }
     // sprites
-    for (const c of this.coinSprites) c.destroy()
+    for (const c of this.coinSprites) c?.destroy()
     this.coinSprites = []
+    for (const t of this.popTexts) t.setVisible(false)
     if (this.flagSprite) { this.flagSprite.destroy(); this.flagSprite = null }
     this.bikeSprite.setVisible(false)
     this.riderSprite.setVisible(false)
@@ -572,11 +578,38 @@ export class OrnnScene extends Phaser.Scene {
     this.syncSprites()
   }
 
+  // Deterministic pickup layout: seeded from the terrain itself, so every
+  // rider sees the identical distribution on a given track — random, but fair
+  // for the leaderboard. Mix of point values plus rare nitro canisters.
   private buildCoins(terrain: Terrain): void {
-    const scale = 20 / 24
-    for (let i = 0; i < terrain.markers.length; i++) {
-      const m = terrain.markers[i]
-      const c = this.add.image(m.x, m.y - 40, 'coin').setScale(scale).setDepth(4)
+    const markers = terrain.markers
+    let seed = (markers.length * 2654435761) ^ Math.round(terrain.endX)
+    const rand = (): number => {
+      // mulberry32
+      seed = (seed + 0x6d2b79f5) | 0
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+    this.pickupValue = new Int16Array(markers.length)
+    for (let i = 0; i < markers.length; i++) {
+      const r = rand()
+      let value = 0
+      if (r >= 0.98) value = -1 // nitro canister
+      else if (r >= 0.93) value = 50
+      else if (r >= 0.8) value = 20
+      else if (r >= 0.55) value = 5
+      this.pickupValue[i] = value
+      if (value === 0) {
+        this.coinSprites.push(null)
+        continue
+      }
+      const m = markers[i]
+      const c = this.add.image(m.x, m.y - 40, 'coin').setDepth(4)
+      if (value === -1) c.setScale(1.05).setTint(0x5ad1ff) // nitro: cyan canister
+      else if (value === 50) c.setScale(1.1).setTint(0xffd766)
+      else if (value === 20) c.setScale(20 / 24)
+      else c.setScale(0.62)
       this.coinSprites.push(c)
     }
   }
@@ -620,13 +653,13 @@ export class OrnnScene extends Phaser.Scene {
     this.startX = sx
     state.started = false
     state.distance = 0
-    state.credits = 0
+    state.points = 0
     state.flips = 0
     state.airTimeMs = 0
     state.timeMs = 0
     state.nitro = 0
     state.collected = new Uint8Array(state.terrain!.markers.length)
-    for (const c of this.coinSprites) c.setVisible(true)
+    for (const c of this.coinSprites) c?.setVisible(true)
     this.collectIdx = 0
     this.trendIdx = 0
     this.clearRunFlags()
@@ -958,12 +991,21 @@ export class OrnnScene extends Phaser.Scene {
       const dx = m.x - bx
       const dy = m.y - 40 - by
       if (dx * dx + dy * dy < 55 * 55) {
+        const value = this.pickupValue[j] ?? 0
+        if (value === 0) { collected[j] = 1; continue }
         collected[j] = 1
-        state.credits += 1
-        if (!state.nitroActive) state.nitro = clamp(state.nitro + NITRO_PER_COIN, 0, 1)
+        if (value === -1) {
+          // nitro canister: half a tank, even mid-boost
+          state.nitro = clamp(state.nitro + 0.5, 0, 1)
+          this.popup(m.x, m.y - 56, 'NITRO', 0x5ad1ff)
+        } else {
+          state.points += value
+          if (!state.nitroActive) state.nitro = clamp(state.nitro + NITRO_PER_COIN, 0, 1)
+          this.popup(m.x, m.y - 56, `+${value}`, value >= 50 ? 0xffd766 : 0x34d97b)
+        }
         this.coinSprites[j]?.setVisible(false)
         if (!this.ctx.isMuted()) this.ctx.audio.coin()
-        this.ePickup.emitParticleAt(m.x, m.y - 40, 10)
+        this.ePickup.emitParticleAt(m.x, m.y - 40, value === -1 || value >= 50 ? 16 : 10)
       }
     }
   }
@@ -976,7 +1018,16 @@ export class OrnnScene extends Phaser.Scene {
       this.flipAccum += da
       while (Math.abs(this.flipAccum) >= TWO_PI) {
         this.pendingFlips++
+        this.lastFlipDir = Math.sign(this.flipAccum)
         this.flipAccum -= Math.sign(this.flipAccum) * TWO_PI
+        // mid-air micro-feedback the instant the rotation completes
+        this.popup(
+          this.chassis.position.x,
+          this.chassis.position.y - 70,
+          this.lastFlipDir < 0 ? 'BACKFLIP' : 'FRONTFLIP',
+          0xf5a524,
+        )
+        this.addShake(2)
       }
     }
     this.lastAngle = angle
@@ -992,11 +1043,15 @@ export class OrnnScene extends Phaser.Scene {
       this.addShake(impact * 0.35)
     }
     if (this.pendingFlips > 0 && state.phase === 'playing') {
+      const bonus = this.pendingFlips * 25
       state.flips += this.pendingFlips
-      state.credits += this.pendingFlips * 5
+      state.points += bonus
       if (!state.nitroActive) state.nitro = clamp(state.nitro + this.pendingFlips * NITRO_PER_FLIP, 0, 1)
       if (!this.ctx.isMuted()) { this.ctx.audio.ping(); this.ctx.audio.boost() }
       this.eBoost.emitParticleAt(this.chassis.position.x, this.chassis.position.y - 24, 8)
+      // landed it: bank the points with a bigger pop
+      this.popup(this.chassis.position.x, this.chassis.position.y - 64, `+${bonus}`, 0xf5a524, 1.25)
+      this.addShake(2.5)
     }
     this.pendingFlips = 0
     this.flipAccum = 0
@@ -1062,6 +1117,7 @@ export class OrnnScene extends Phaser.Scene {
     this.updateShake(dt)
     this.updateCamera()
     this.ambientFx()
+    this.updatePopups()
     this.syncSprites()
     this.applyCamera()
     this.drawWorld()
@@ -1130,6 +1186,39 @@ export class OrnnScene extends Phaser.Scene {
     cam.centerOn(c.x + this.shx / zoom, c.y + this.shy / zoom)
   }
 
+  // ---- floating score popups (pooled world-space texts) -------------------
+  private popup(x: number, y: number, msg: string, tint: number, scale = 1): void {
+    let txt = this.popTexts.find(t => !t.visible)
+    if (!txt) {
+      if (this.popTexts.length >= 14) return // pool cap; drop excess spam
+      txt = this.add.text(0, 0, '', {
+        fontFamily: SANS, fontSize: '17px', fontStyle: '700', color: '#ffffff',
+        stroke: '#050505', strokeThickness: 4,
+      }).setOrigin(0.5, 1).setDepth(9).setVisible(false)
+      this.popTexts.push(txt)
+    }
+    txt.setText(msg)
+    txt.setTint(tint)
+    txt.setScale(scale)
+    txt.setPosition(x, y)
+    txt.setAlpha(1)
+    txt.setVisible(true)
+    txt.setData('born', this.ctx.state.timeMs)
+    txt.setData('baseY', y)
+  }
+
+  private updatePopups(): void {
+    const now = this.ctx.state.timeMs
+    for (const txt of this.popTexts) {
+      if (!txt.visible) continue
+      const age = now - (txt.getData('born') as number)
+      if (age > 900) { txt.setVisible(false); continue }
+      const k = age / 900
+      txt.y = (txt.getData('baseY') as number) - k * 46
+      txt.setAlpha(k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45)
+    }
+  }
+
   private ambientFx(): void {
     const state = this.ctx.state
     this.fxTick++
@@ -1181,7 +1270,7 @@ export class OrnnScene extends Phaser.Scene {
     const markers = this.ctx.state.terrain!.markers
     for (let i = 0; i < coins.length; i++) {
       const c = coins[i]
-      if (!c.visible) continue
+      if (!c || !c.visible) continue
       if (markers[i].x < wv.x - 40 || markers[i].x > wv.right + 40) continue
       c.y = markers[i].y - 40 + bob
     }

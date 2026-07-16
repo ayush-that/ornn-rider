@@ -96,7 +96,7 @@ export interface GameState {
   bike: BikeView | null
   camera: { x: number; y: number; zoom: number }
   distance: number // px progressed
-  credits: number // collected day-marker coins
+  points: number // collected pickups + flip bonuses (the leaderboard score)
   airTimeMs: number
   flips: number
   bestDistance: Record<string, number> // per track id, localStorage-backed

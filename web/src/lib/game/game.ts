@@ -3,7 +3,7 @@
 // live in OrnnScene (scene.ts). Phaser must never be imported server-side; the
 // route dynamically imports this module inside a useEffect (see index.tsx).
 import * as Phaser from 'phaser'
-import type { GameState, Track, GpuRange, SeriesPoint, RunResult } from './types'
+import type { GameState, Track, GpuRange, RunResult } from './types'
 import { TRACKS, CATEGORIES, fetchSeries, normalizeRange } from './data'
 import { buildTerrain } from './terrain'
 import { createHud } from './hud'
@@ -65,28 +65,6 @@ function saveLast(trackId: string, range: GpuRange): void {
   }
 }
 
-// Day-over-day change of the latest value: latest vs the value ~24h earlier.
-function computeDayChange(series: SeriesPoint[]): number {
-  const n = series.length
-  if (n < 2) return 0
-  const last = series[n - 1]
-  const target = last.t - 86_400_000
-  if (target <= series[0].t) {
-    const prev = series[0].v
-    return prev !== 0 ? ((last.v - prev) / prev) * 100 : 0
-  }
-  let lo = 0, hi = n - 1
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1
-    if (series[mid].t <= target) lo = mid
-    else hi = mid - 1
-  }
-  const a = series[lo], b = series[Math.min(lo + 1, n - 1)]
-  const f = b.t !== a.t ? (target - a.t) / (b.t - a.t) : 0
-  const prev = a.v + (b.v - a.v) * f
-  return prev !== 0 ? ((last.v - prev) / prev) * 100 : 0
-}
-
 let activeStop: (() => void) | null = null
 
 export function stopGame(): void {
@@ -132,7 +110,7 @@ export function startGame(
     bike: null,
     camera: { x: 0, y: 0, zoom: 1 },
     distance: 0,
-    credits: 0,
+    points: 0,
     airTimeMs: 0,
     flips: 0,
     bestDistance: loadBest(),
@@ -148,7 +126,7 @@ export function startGame(
   ;(window as unknown as Record<string, unknown>).__ornn = {
     get phase() { return state.phase },
     get distance() { return state.distance },
-    get credits() { return state.credits },
+    get points() { return state.points },
     get flips() { return state.flips },
     get trend() { return state.trend },
     get nitro() { return state.nitro },
@@ -176,7 +154,7 @@ export function startGame(
       category: t.category,
       range: state.range,
       distance: Math.round(state.distance / 10),
-      coins: state.credits,
+      coins: state.points,
       flips: state.flips,
       finished: state.phase === 'finished',
     })
@@ -240,8 +218,7 @@ export function startGame(
       state.range = range
       state.terrain = terrain
       state.latestPrice = series[series.length - 1]!.v
-      state.latestChangePct = computeDayChange(series)
-      hud.setHeader(state.latestPrice, state.latestChangePct)
+      hud.setHeader(state.latestPrice)
       hud.setActive(track, range)
       hud.setLoading(null)
       saveLast(track.id, range)
