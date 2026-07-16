@@ -130,7 +130,9 @@ export default defineConfig({
     }),
     tanstackStart(),
     // https://tanstack.com/start/latest/docs/framework/react/guide/hosting
-    nitro(),
+    // Cloudflare Workers deploy: builds .output/server worker + .output/public
+    // assets, deployed with wrangler (see wrangler.jsonc).
+    nitro({ preset: "cloudflare-module" }),
     viteReact(),
     // https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#react-compiler
     babel({
