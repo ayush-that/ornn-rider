@@ -53,7 +53,14 @@ const WHEELIE_TORQUE = 0.018 // raised for the wider 112 wheelbase (was 0.007 at
 const MAX_WHEELIE_AV = 0.11
 // Arcade lean: one constant authority at every angle, grounded or not, so the
 // bike can always be righted from a nose-stand (user call: no realistic physics).
-const LEAN = 0.05
+// Three decoupled lean strengths (the user only wanted FLIPS faster):
+// FLIP_LEAN — deliberate flip keys (Up/Down) in the air + nose-stand recovery.
+// AIR_LEAN — throttle/brake doubling as subtle air correction (original feel,
+//            so holding gas off a cliff doesn't pitch/"boost" you forward).
+// GROUND_LEAN — weight-shift while riding; small, keeps the bike feeling heavy.
+const FLIP_LEAN = 0.05
+const AIR_LEAN = 0.022
+const GROUND_LEAN = 0.006
 // Past this tilt (|angle| from upright, rad) left/right double as lean even on
 // the ground — driving inputs are useless in that orientation anyway.
 const TIPPED_ANGLE = 1.75
@@ -721,9 +728,9 @@ export class OrnnScene extends Phaser.Scene {
       B.setAngularVelocity(this.wheelFront, approach(this.wheelFront.angularVelocity, 0, BRAKE_DECEL))
     }
   }
-  private lean(dir: -1 | 0 | 1): void {
-    if (dir === 0) return
-    this.matter.body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + dir * LEAN)
+  private lean(dir: -1 | 0 | 1, k: number): void {
+    if (dir === 0 || k === 0) return
+    this.matter.body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + dir * k)
   }
 
   // |chassis angle from upright| normalized to [0, π] — flips accumulate 2π's.
@@ -772,10 +779,20 @@ export class OrnnScene extends Phaser.Scene {
       if (fwd) state.started = true
       this.throttle(fwd ? 1 : brk ? -1 : 0)
 
-      const canSteer = airborne || this.tilt() > TIPPED_ANGLE
-      const leanBack = this.down('ArrowUp') || (canSteer && (this.down('KeyA') || this.down('ArrowLeft')))
-      const leanFwd = this.down('ArrowDown') || (canSteer && (this.down('KeyD') || this.down('ArrowRight')))
-      this.lean(leanFwd ? 1 : leanBack ? -1 : 0)
+      const tipped = this.tilt() > TIPPED_ANGLE
+      const up = this.down('ArrowUp')
+      const down = this.down('ArrowDown')
+      const auxBack = this.down('KeyA') || this.down('ArrowLeft')
+      const auxFwd = this.down('KeyD') || this.down('ArrowRight')
+      if (up || down) {
+        // dedicated flip keys: fast in the air (and for tipped recovery),
+        // gentle weight-shift on the ground
+        this.lean(down ? 1 : -1, airborne || tipped ? FLIP_LEAN : GROUND_LEAN)
+      } else if ((airborne || tipped) && (auxBack || auxFwd)) {
+        // throttle/brake double as lean: subtle correction only, except when
+        // tipped past ride angles where they become recovery controls
+        this.lean(auxFwd ? 1 : -1, tipped ? FLIP_LEAN : AIR_LEAN)
+      }
 
       // Trend tailwind: a strong bull market pushes you forward.
       if (state.started && Math.abs(state.trend) > 0.3) {
@@ -786,7 +803,7 @@ export class OrnnScene extends Phaser.Scene {
       this.updateNitro(chassis)
     } else {
       this.throttle(0)
-      this.lean(0)
+      this.lean(0, 0)
       state.nitroActive = false
       this.nitroLatch = false
       // Leaving 'playing' (crash/finish/menu) mid-boost: cut the whoosh.
