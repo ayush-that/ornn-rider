@@ -10,7 +10,14 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  // Zone routes (not custom domains): the zone already has proxied DNS records
+  // pointing at a dead origin (525), which blocks the custom-domain API. Routes
+  // intercept at the edge regardless of origin health.
+  "routes": [
+    { "pattern": "engineerboyfriend.com/*", "zone_name": "engineerboyfriend.com" },
+    { "pattern": "www.engineerboyfriend.com/*", "zone_name": "engineerboyfriend.com" }
+  ]
   // Secrets (set once with `npx wrangler secret put <NAME>`):
   //   ORNN_API_KEY — injected server-side by the /api proxy route
 }
