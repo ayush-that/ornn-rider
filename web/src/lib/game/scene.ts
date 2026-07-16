@@ -269,6 +269,7 @@ export class OrnnScene extends Phaser.Scene {
   private flipAccum = 0
   private pendingFlips = 0
   private lastFlipDir = 1
+  private parked = false
   private lastAngle = 0
   private resultsShown = false
   private outcomeAt = 0
@@ -779,6 +780,20 @@ export class OrnnScene extends Phaser.Scene {
       if (fwd) state.started = true
       this.throttle(fwd ? 1 : brk ? -1 : 0)
 
+      // Static friction: the suspension springs micro-jitter the bodies a few
+      // px/s forever, so an untouched bike never reads 0 km/h. With no drive
+      // input, grounded and nearly still, park it. Slopes still roll — gravity
+      // pushes past the threshold within a step or two.
+      this.parked = !fwd && !brk && this.grounded && this.chassis.speed < 0.6
+      if (this.parked) {
+        const B = this.matter.body
+        for (const b of [this.chassis, this.wheelBack, this.wheelFront, this.riderHead]) {
+          B.setVelocity(b, { x: 0, y: 0 })
+        }
+        B.setAngularVelocity(this.wheelBack, 0)
+        B.setAngularVelocity(this.wheelFront, 0)
+      }
+
       const tipped = this.tilt() > TIPPED_ANGLE
       const up = this.down('ArrowUp')
       const down = this.down('ArrowDown')
@@ -921,7 +936,9 @@ export class OrnnScene extends Phaser.Scene {
   private syncBikeState(): void {
     this.enforceBikeIntegrity()
     this.grounded = this.contacts > 0
-    this._speed = this.chassis.speed * 60
+    // The constraint solver re-injects ~0.1 px/step of spring jitter after the
+    // park snap, so a parked bike would still read 1 km/h without this.
+    this._speed = this.parked ? 0 : this.chassis.speed * 60
     this._rpm = Math.min(Math.abs(this.wheelBack.angularVelocity) / MAX_WHEEL_AV, 1)
     if (this.headHit) {
       // Only a real wipeout kills: head contact while the bike is pitched past
