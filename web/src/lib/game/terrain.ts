@@ -26,8 +26,9 @@ export function buildTerrain(series: SeriesPoint[]): Terrain {
   const n = series.length
   if (n < 2) throw new Error('buildTerrain: need at least 2 series points')
 
-  // Adaptive horizontal spacing: any series length yields a ~15-25k px track.
-  const dx = clamp(Math.round(22000 / n), 40, 260)
+  // Fixed day spacing (the old 3-month density): longer history = longer map,
+  // never a denser one. Full H100 (~750d) ≈ 180k px; NAND (~1900d) ≈ 460k px.
+  const dx = 240
   const maxDy = Math.tan(MAX_SLOPE_RAD) * dx // per-segment rise/fall cap
 
   // Return-driven heights: each segment's rise/fall is proportional to its

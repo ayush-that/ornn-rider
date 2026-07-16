@@ -48,8 +48,10 @@ export interface Category {
   ranges: GpuRange[] // applicable ranges (memory/tokens are daily-only)
 }
 
+// One race per track: the full daily history (the range picker collapsed away —
+// hud hides the pill row whenever a category has a single range).
 export const CATEGORIES: Category[] = [
-  { id: 'compute', label: 'COMPUTE', unit: '/hr', tracks: COMPUTE_TRACKS, ranges: ['1w', '1m', '3m', 'all'] },
+  { id: 'compute', label: 'COMPUTE', unit: '/hr', tracks: COMPUTE_TRACKS, ranges: ['all'] },
   { id: 'memory', label: 'MEMORY', unit: '/unit', tracks: MEMORY_TRACKS, ranges: ['all'] },
   { id: 'tokens', label: 'TOKENS', unit: '/Mtok', tracks: TOKEN_TRACKS, ranges: ['all'] },
 ]
@@ -68,10 +70,9 @@ export function categoryOf(cat: TrackCategory): Category {
   return CATEGORIES.find(c => c.id === cat) ?? CATEGORIES[0]
 }
 
-// Default range for a category: 3m for compute, the sole range otherwise.
 export function defaultRange(cat: TrackCategory): GpuRange {
   const ranges = categoryOf(cat).ranges
-  return ranges.includes('3m') ? '3m' : ranges[ranges.length - 1]
+  return ranges[ranges.length - 1]
 }
 
 // Clamp a range to what the track's category actually supports.
@@ -80,7 +81,6 @@ export function normalizeRange(track: Track, range: GpuRange): GpuRange {
   return ranges.includes(range) ? range : defaultRange(track.category)
 }
 
-const DAY_MS = 86_400_000
 
 // Build the proxied API path for a track+range. Auth is injected server-side by
 // the /api proxy — never here. Each category has its own endpoint + response
@@ -101,23 +101,11 @@ function endpointFor(track: Track, range: GpuRange): string {
     return `/api/otpi?lab=${encodeURIComponent(track.apiId)}&startDate=2024-01-01&endDate=${today}`
   }
 
-  // compute
+  // compute: full daily history for every GPU (H200 → ~540 points, H100 → ~750).
   const enc = encodeURIComponent(track.apiId)
-  if (range === '1w' || range === '1m') {
-    const days = range === '1w' ? 7 : 30
-    const limit = range === '1w' ? 300 : 800
-    const start = iso(now - days * DAY_MS)
-    const end = iso(now)
-    return `/api/gpu/${enc}/history-simple?granularity=hourly&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=${limit}`
-  }
-  if (range === 'all') {
-    // Full daily history for every GPU (H200 → ~540 points, H100 → ~750).
-    const start = '2023-01-01T00:00:00Z'
-    const end = iso(now)
-    return `/api/gpu/${enc}/history-simple?granularity=daily&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=3000`
-  }
-  // 3m = daily index history.
-  return `/api/gpu/${enc}/index-history`
+  const start = '2023-01-01T00:00:00Z'
+  const end = iso(now)
+  return `/api/gpu/${enc}/history-simple?granularity=daily&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=3000`
 }
 
 // Normalize a category's response rows to {t, v}. compute serves
