@@ -119,7 +119,17 @@ const CSS = `
   transition: filter .1s, border-color .1s;
 }
 #oh-abtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
-@media (pointer: coarse) { #oh-dpad { display: block; } #oh-abtn { display: flex; } }
+@media (pointer: coarse) {
+  #oh-dpad { display: block; }
+  #oh-abtn { display: flex; }
+  /* Clear the D-pad/A-button footprint on ANY coarse-pointer device, not just
+     narrow phones — without this, tablets/touch laptops wider than the
+     max-width:700px breakpoint below get stats/speed/nitro rendered directly
+     under the new controls. */
+  #oh-stats { bottom: 168px; }
+  #oh-speed { bottom: 168px; }
+  #oh-nitro { bottom: 100px; width: 100px; }
+}
 #oh-hint {
   position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
   font-size: 12px; color: ${C.dim}; letter-spacing: 0.05em; line-height: 1.5;
@@ -412,6 +422,15 @@ export function createHud(
   wireDpadBtn(dpadUp, onTouch.throttle);
   wireDpadBtn(dpadLeft, onTouch.brake);
   wireDpadBtn(dpadRight, onTouch.leanFwd);
+  // game.ts's window 'blur' handler already resets touch.throttle/brake/leanFwd
+  // to false (so a backgrounded tab can't leave gas held down), but that lives
+  // outside hud.ts and has no reference to these buttons — without this, the
+  // 'pressed' glow would stay lit after blur even though input already stopped.
+  window.addEventListener("blur", () => {
+    dpadUp.classList.remove("pressed");
+    dpadLeft.classList.remove("pressed");
+    dpadRight.classList.remove("pressed");
+  });
 
   // A button (touch): nitro.
   const aBtn = el("button", "");
