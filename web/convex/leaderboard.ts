@@ -6,17 +6,14 @@ import { mutation, query } from "./_generated/server";
 
 const CATEGORY = v.union(v.literal("compute"), v.literal("memory"), v.literal("tokens"));
 
-// Same formula the game HUD shows: distance + coin and flip bonuses.
-function computeScore(distance: number, coins: number, flips: number): number {
-  return Math.round(distance + coins * 100 + flips * 500);
-}
-
 export const submitRun = mutation({
   args: {
     trackId: v.string(),
     category: CATEGORY,
     range: v.optional(v.string()),
     distance: v.number(),
+    // Points collected in the run (pickups + flip bonuses). Kept under the
+    // legacy `coins` field name to avoid a schema migration.
     coins: v.number(),
     flips: v.number(),
   },
@@ -27,7 +24,8 @@ export const submitRun = mutation({
     const distance = Math.max(0, Math.min(Math.round(args.distance), 1_000_000));
     const coins = Math.max(0, Math.min(Math.round(args.coins), 100_000));
     const flips = Math.max(0, Math.min(Math.round(args.flips), 10_000));
-    const score = computeScore(distance, coins, flips);
+    // The leaderboard ranks by points, full stop.
+    const score = coins;
     await ctx.db.insert("scores", {
       userId,
       trackId: args.trackId,

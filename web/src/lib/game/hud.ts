@@ -50,12 +50,6 @@ const CSS = `
 #oh-datetime { margin-top: 6px; font-size: 11px; color: #8a8a8a; letter-spacing: 0.05em; min-height: 14px; }
 #oh-price { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
 #oh-price .oh-hr { font-size: 14px; font-weight: 400; color: ${C.dim}; margin-left: 6px; }
-#oh-change {
-  font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 0;
-  border: 2px solid transparent; font-variant-numeric: tabular-nums; line-height: 1.2;
-}
-#oh-change.up { color: ${C.chgUpText}; background: ${C.chgUpBg}; border-color: #1d4a2e; }
-#oh-change.down { color: ${C.chgDownText}; background: ${C.chgDownBg}; border-color: #4a231d; }
 #oh-ranges { display: flex; gap: 6px; margin-left: 6px; }
 .oh-pill {
   pointer-events: auto; cursor: pointer; background: #0c0c0c;
@@ -193,7 +187,6 @@ export function createHud(
     <div id="oh-tabline"></div>
     <div id="oh-priceblock">
       <div id="oh-price" class="oh-mono">$0.00<span class="oh-hr">/hr</span></div>
-      <div id="oh-change" class="up oh-mono">+0.00%</div>
       <div id="oh-ranges"></div>
     </div>
     <div id="oh-datetime" class="oh-mono"></div>`
@@ -202,7 +195,6 @@ export function createHud(
   const catsEl = header.querySelector<HTMLElement>('#oh-cats')!
   const tabsEl = header.querySelector<HTMLElement>('#oh-tabs')!
   const priceEl = header.querySelector<HTMLElement>('#oh-price')!
-  const changeEl = header.querySelector<HTMLElement>('#oh-change')!
   const rangesEl = header.querySelector<HTMLElement>('#oh-ranges')!
   const datetimeEl = header.querySelector<HTMLElement>('#oh-datetime')!
 
@@ -277,12 +269,9 @@ export function createHud(
     priceEl.innerHTML = `$${price.toFixed(decimals)}<span class="oh-hr">${unit}</span>`
   }
 
-  function setHeader(price: number, changePct: number): void {
+  function setHeader(price: number): void {
     setPrice(price)
     datetimeEl.textContent = ''
-    const up = changePct >= 0
-    changeEl.textContent = `${up ? '+' : ''}${changePct.toFixed(2)}%`
-    changeEl.className = `${up ? 'up' : 'down'} oh-mono`
   }
 
   // ---- in-run stats ----
@@ -290,7 +279,7 @@ export function createHud(
   stats.id = 'oh-stats'
   stats.innerHTML = `
     <div class="oh-stat"><span class="oh-k">Distance</span><span class="oh-v oh-mono" data-k="dist">0 m</span></div>
-    <div class="oh-stat"><span class="oh-k">Credits</span><span class="oh-v cred oh-mono" data-k="cred">0</span></div>
+    <div class="oh-stat"><span class="oh-k">Points</span><span class="oh-v cred oh-mono" data-k="cred">0</span></div>
     <div class="oh-stat"><span class="oh-k">Best</span><span class="oh-v oh-mono" data-k="best">—</span></div>`
   const sDist = stats.querySelector<HTMLElement>('[data-k="dist"]')!
   const sCred = stats.querySelector<HTMLElement>('[data-k="cred"]')!
@@ -364,7 +353,7 @@ export function createHud(
 
     const dist = Math.round(state.distance / 10)
     if (dist !== lastDist) { lastDist = dist; sDist.textContent = `${dist} m` }
-    if (state.credits !== lastCred) { lastCred = state.credits; sCred.textContent = String(state.credits) }
+    if (state.points !== lastCred) { lastCred = state.points; sCred.textContent = String(state.points) }
     const best = state.track ? (state.bestDistance[state.track.id] ?? 0) : 0
     if (best !== lastBest) { lastBest = best; sBest.textContent = fmtBest(best) }
     // Display calibration, not physics: raw is px/s; the literal 10px=1m scale
@@ -392,7 +381,7 @@ export function createHud(
       <div class="oh-newbest">${state.newBest ? '★ NEW BEST' : ''}</div>
       <div class="oh-resgrid">
         <div class="oh-rescell"><div class="oh-k">Distance</div><div class="oh-v oh-mono">${distM.toLocaleString('en-US')} m</div></div>
-        <div class="oh-rescell"><div class="oh-k">Credits</div><div class="oh-v oh-mono" style="color:${C.amber}">${state.credits}</div></div>
+        <div class="oh-rescell"><div class="oh-k">Points</div><div class="oh-v oh-mono" style="color:${C.amber}">${state.points}</div></div>
         <div class="oh-rescell"><div class="oh-k">Flips</div><div class="oh-v oh-mono">${state.flips}</div></div>
         <div class="oh-rescell"><div class="oh-k">Air time</div><div class="oh-v oh-mono">${(state.airTimeMs / 1000).toFixed(1)}s</div></div>
       </div>

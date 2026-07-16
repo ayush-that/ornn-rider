@@ -267,9 +267,8 @@ function Leaderboard({
                   <th className="py-1.5 pr-2 font-semibold">RIDER</th>
                   {trackId === null ? <th className="py-1.5 pr-2 font-semibold">TRACK</th> : null}
                   <th className="py-1.5 pr-2 text-right font-semibold">DIST</th>
-                  <th className="py-1.5 pr-2 text-right font-semibold">COINS</th>
                   <th className="py-1.5 pr-2 text-right font-semibold">FLIPS</th>
-                  <th className="py-1.5 text-right font-semibold">SCORE</th>
+                  <th className="py-1.5 text-right font-semibold">POINTS</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,9 +291,8 @@ function Leaderboard({
                       <td className="py-2 pr-2 text-[#909090]">{r.trackId.split(":")[1]}</td>
                     ) : null}
                     <td className="py-2 pr-2 text-right tabular-nums">{r.distance}m</td>
-                    <td className="py-2 pr-2 text-right text-[#f5a524] tabular-nums">{r.coins}</td>
                     <td className="py-2 pr-2 text-right tabular-nums">{r.flips}</td>
-                    <td className="py-2 text-right font-semibold text-[#34d97b] tabular-nums">
+                    <td className="py-2 text-right font-semibold text-[#f5a524] tabular-nums">
                       {r.score}
                     </td>
                   </tr>

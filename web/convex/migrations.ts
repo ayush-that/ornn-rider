@@ -1,5 +1,23 @@
 import { internalMutation } from "./_generated/server";
 
+// One-off: drop the pre-launch prototype rows (anonName-era test runs). Their
+// scores are on the old distance+bonus scale and would sit above every real
+// points-based run forever.
+export const clearPrototypeScores = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("scores").collect();
+    let deleted = 0;
+    for (const row of rows) {
+      if (row.anonName !== undefined || row.userId === undefined) {
+        await ctx.db.delete(row._id);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  },
+});
+
 // One-off, idempotent: stamp category on pre-category score rows (gpu:/mem:/tok: prefix).
 export const backfillScoreCategories = internalMutation({
   args: {},
