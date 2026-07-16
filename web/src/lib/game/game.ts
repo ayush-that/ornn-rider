@@ -25,24 +25,41 @@ function loadBest(): Record<string, number> {
 
 function loadLast(): { track: Track; range: GpuRange } {
   let trackId = 'h100'
-  let range: GpuRange = '3m'
+  // Deep link wins: /?track=<id> (e.g. ?track=mem-nand, ?track=tok-anthropic)
+  // lands straight on that track; localStorage is the fallback.
+  try {
+    const urlTrack = new URLSearchParams(location.search).get('track')
+    if (urlTrack && TRACKS.some(t => t.id === urlTrack)) {
+      const track = TRACKS.find(t => t.id === urlTrack)!
+      return { track, range: normalizeRange(track, 'all') }
+    }
+  } catch {
+    /* ignore */
+  }
   try {
     const raw = localStorage.getItem(LAST_KEY)
     if (raw) {
-      const p = JSON.parse(raw) as { trackId?: string; range?: GpuRange }
+      const p = JSON.parse(raw) as { trackId?: string }
       if (p.trackId && TRACKS.some(t => t.id === p.trackId)) trackId = p.trackId
-      if (p.range === '1w' || p.range === '1m' || p.range === '3m' || p.range === 'all') range = p.range
     }
   } catch {
     /* ignore */
   }
   const track = TRACKS.find(t => t.id === trackId) ?? TRACKS[0]
-  return { track, range: normalizeRange(track, range) }
+  return { track, range: normalizeRange(track, 'all') }
 }
 
 function saveLast(trackId: string, range: GpuRange): void {
   try {
     localStorage.setItem(LAST_KEY, JSON.stringify({ trackId, range }))
+  } catch {
+    /* ignore */
+  }
+  // Keep the URL shareable: whatever you're riding is the link.
+  try {
+    const url = new URL(location.href)
+    url.searchParams.set('track', trackId)
+    history.replaceState(null, '', url)
   } catch {
     /* ignore */
   }
