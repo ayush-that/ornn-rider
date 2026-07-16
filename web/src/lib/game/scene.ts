@@ -873,9 +873,12 @@ export class OrnnScene extends Phaser.Scene {
     for (let j = this.collectIdx; j < markers.length && markers[j].x < bx + 60; j++) {
       if (collected[j]) continue
       const m = markers[j]
+      // Check against the coin's DRAWN position (40px above the marker), not
+      // the ground point — the chassis passes right at coin height, so this
+      // is the difference between hoovering coins up and sailing past them.
       const dx = m.x - bx
-      const dy = m.y - by
-      if (dx * dx + dy * dy < 40 * 40) {
+      const dy = m.y - 40 - by
+      if (dx * dx + dy * dy < 55 * 55) {
         collected[j] = 1
         state.credits += 1
         if (!state.nitroActive) state.nitro = clamp(state.nitro + NITRO_PER_COIN, 0, 1)
