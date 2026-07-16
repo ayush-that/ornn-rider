@@ -736,7 +736,39 @@ export class OrnnScene extends Phaser.Scene {
     }
   }
 
+  // Hard landings can blow a wheel out of its suspension socket: the soft
+  // constraints stretch/flip under extreme impact and never recover, so the
+  // sprite's swingarm/silencer no longer lines up with the wheel and the
+  // wedged wheel blocks the bike. Terminal fall speed + hard bump stops keep
+  // the bike assembled no matter how hard it smashes down.
+  private enforceBikeIntegrity(): void {
+    const MAX_FALL = 26 // px/step terminal velocity
+    for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
+      if (b.velocity.y > MAX_FALL) this.matter.body.setVelocity(b, { x: b.velocity.x, y: MAX_FALL })
+    }
+    const a = this.chassis.angle
+    const cos = Math.cos(a)
+    const sin = Math.sin(a)
+    const p = this.chassis.position
+    const MAX_TRAVEL = 26 // max distance a wheel may sit from its socket
+    const fix = (wheel: Body, dx: number): void => {
+      const sx = p.x + cos * dx - sin * WHEEL_DY
+      const sy = p.y + sin * dx + cos * WHEEL_DY
+      const ex = wheel.position.x - sx
+      const ey = wheel.position.y - sy
+      const d2 = ex * ex + ey * ey
+      if (d2 > MAX_TRAVEL * MAX_TRAVEL) {
+        const k = MAX_TRAVEL / Math.sqrt(d2)
+        this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
+        this.matter.body.setVelocity(wheel, { x: this.chassis.velocity.x, y: this.chassis.velocity.y })
+      }
+    }
+    fix(this.wheelBack, BACK_DX)
+    fix(this.wheelFront, FRONT_DX)
+  }
+
   private syncBikeState(): void {
+    this.enforceBikeIntegrity()
     this.grounded = this.contacts > 0
     this._speed = this.chassis.speed * 60
     this._rpm = Math.min(Math.abs(this.wheelBack.angularVelocity) / MAX_WHEEL_AV, 1)
