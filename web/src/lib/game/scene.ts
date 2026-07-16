@@ -580,23 +580,12 @@ export class OrnnScene extends Phaser.Scene {
     this.flagSprite = this.add.image(terrain.endX, gy, 'flag').setOrigin(0.12, 0.98).setScale(120 / 67).setDepth(4)
   }
 
-  private resetRunState(sx: number): void {
+  // Transient per-life state: cleared on every (re)spawn, full reset or resume.
+  private clearRunFlags(): void {
     const state = this.ctx.state
-    this.startX = sx
-    state.started = false
-    state.distance = 0
-    state.credits = 0
-    state.flips = 0
-    state.airTimeMs = 0
-    state.trend = 0
-    state.timeMs = 0
-    state.nitro = 0
     state.nitroActive = false
-    state.collected = new Uint8Array(state.terrain!.markers.length)
     state.newBest = false
-    for (const c of this.coinSprites) c.setVisible(true)
-    this.collectIdx = 0
-    this.trendIdx = 0
+    state.trend = 0
     this.prevGrounded = true
     this.airMaxVy = 0
     this.flipAccum = 0
@@ -620,16 +609,40 @@ export class OrnnScene extends Phaser.Scene {
     state.camera.zoom = 1
   }
 
-  // Same-track restart: reset the existing bike/world (no rebuild).
+  private resetRunState(sx: number): void {
+    const state = this.ctx.state
+    this.startX = sx
+    state.started = false
+    state.distance = 0
+    state.credits = 0
+    state.flips = 0
+    state.airTimeMs = 0
+    state.timeMs = 0
+    state.nitro = 0
+    state.collected = new Uint8Array(state.terrain!.markers.length)
+    for (const c of this.coinSprites) c.setVisible(true)
+    this.collectIdx = 0
+    this.trendIdx = 0
+    this.clearRunFlags()
+  }
+
+  // Same-track restart. A crash resumes from where you died — the maps are
+  // full-history long now — keeping distance/coins/flips/collected markers.
+  // Finishing (or a menu retry) starts a fresh run from the beginning.
   restartRun(): void {
     const state = this.ctx.state
     if (!state.terrain || !this.built) return
     this.ctx.hud.hideResults()
     if (this.ragdoll) { this.matter.world.remove(this.ragdoll); this.ragdoll = null }
-    const sx = state.terrain.startX + SPAWN_DX
-    const sy = state.terrain.groundY(sx) - SPAWN_DY
+    const t = state.terrain
+    const resume = state.phase === 'crashed'
+    const sx = resume
+      ? clamp(this.chassis.position.x, t.startX + SPAWN_DX, t.endX - 200)
+      : t.startX + SPAWN_DX
+    const sy = t.groundY(sx) - SPAWN_DY
     this.bikeReset(sx, sy)
-    this.resetRunState(sx)
+    if (resume) this.clearRunFlags()
+    else this.resetRunState(sx)
     state.phase = 'playing'
   }
 
