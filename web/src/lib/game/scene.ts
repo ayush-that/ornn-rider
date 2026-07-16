@@ -51,8 +51,12 @@ const BRAKE_DECEL = 0.09
 const REVERSE_TARGET_AV = -0.28
 const WHEELIE_TORQUE = 0.018 // raised for the wider 112 wheelbase (was 0.007 at 64)
 const MAX_WHEELIE_AV = 0.11
-const AIR_LEAN = 0.022
-const GROUND_LEAN = 0.006
+// Arcade lean: one constant authority at every angle, grounded or not, so the
+// bike can always be righted from a nose-stand (user call: no realistic physics).
+const LEAN = 0.022
+// Past this tilt (|angle| from upright, rad) left/right double as lean even on
+// the ground — driving inputs are useless in that orientation anyway.
+const TIPPED_ANGLE = 1.75
 
 // --- Terrain body tuning ---------------------------------------------------
 const SEG_THICKNESS = 50
@@ -667,8 +671,15 @@ export class OrnnScene extends Phaser.Scene {
   }
   private lean(dir: -1 | 0 | 1): void {
     if (dir === 0) return
-    const k = this.grounded ? GROUND_LEAN : AIR_LEAN
-    this.matter.body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + dir * k)
+    this.matter.body.setAngularVelocity(this.chassis, this.chassis.angularVelocity + dir * LEAN)
+  }
+
+  // |chassis angle from upright| normalized to [0, π] — flips accumulate 2π's.
+  private tilt(): number {
+    let a = this.chassis.angle % TWO_PI
+    if (a > Math.PI) a -= TWO_PI
+    if (a < -Math.PI) a += TWO_PI
+    return Math.abs(a)
   }
 
   private down(code: string): boolean {
@@ -709,8 +720,9 @@ export class OrnnScene extends Phaser.Scene {
       if (fwd) state.started = true
       this.throttle(fwd ? 1 : brk ? -1 : 0)
 
-      const leanBack = this.down('ArrowUp') || (airborne && (this.down('KeyA') || this.down('ArrowLeft')))
-      const leanFwd = this.down('ArrowDown') || (airborne && (this.down('KeyD') || this.down('ArrowRight')))
+      const canSteer = airborne || this.tilt() > TIPPED_ANGLE
+      const leanBack = this.down('ArrowUp') || (canSteer && (this.down('KeyA') || this.down('ArrowLeft')))
+      const leanFwd = this.down('ArrowDown') || (canSteer && (this.down('KeyD') || this.down('ArrowRight')))
       this.lean(leanFwd ? 1 : leanBack ? -1 : 0)
 
       // Trend tailwind: a strong bull market pushes you forward.
@@ -768,7 +780,8 @@ export class OrnnScene extends Phaser.Scene {
   // wedged wheel blocks the bike. Terminal fall speed + hard bump stops keep
   // the bike assembled no matter how hard it smashes down.
   private enforceBikeIntegrity(): void {
-    const MAX_FALL = 26 // px/step terminal velocity
+    const MAX_FALL = 20 // px/step terminal velocity — capped low so a long drop
+    // lands with a survivable impulse instead of blowing the wheels out of socket
     const MAX_HORIZ = 40 // px/step terminal horizontal speed
     for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
       const vx = clamp(b.velocity.x, -MAX_HORIZ, MAX_HORIZ)
@@ -779,35 +792,52 @@ export class OrnnScene extends Phaser.Scene {
     const cos = Math.cos(a)
     const sin = Math.sin(a)
     const p = this.chassis.position
-    // Generous travel so normal suspension work never triggers a correction
-    // (hard 26px stops fired constantly on jagged terrain = visible jitter).
-    // Within the soft band, ease back; only a true blow-out gets snapped.
-    const MAX_TRAVEL = 20
-    const SNAP = 55
+    // Split the socket error into chassis-local axes and treat them differently.
+    // VERTICAL (suspension) keeps a generous soft travel so jagged terrain never
+    // trips a hard correction (that was the old jitter). FORE/AFT is held tight:
+    // a hard slam scatters the wheel sideways out from under the swingarm and it
+    // never eases back, which is what leaves the bike looking ruined — clamping
+    // it keeps the wheel socketed no matter how hard the landing.
+    const LAT_MAX = 8 // fore/aft: wheel stays under the swingarm
+    const VERT_TRAVEL = 20 // stretch give before the bump stop
+    const VERT_SNAP = 55 // beyond this the wheel has blown out — hard reseat
+    // Compression is asymmetric: easing here lets the wheel tuck visibly INTO
+    // the frame on rear-first slams ("squeezed" bike), so it hard-stops early.
+    const COMPRESS_MAX = 8
     const fix = (wheel: Body, dx: number): void => {
       const sx = p.x + cos * dx - sin * WHEEL_DY
       const sy = p.y + sin * dx + cos * WHEEL_DY
       const ex = wheel.position.x - sx
       const ey = wheel.position.y - sy
-      const d2 = ex * ex + ey * ey
-      if (d2 <= MAX_TRAVEL * MAX_TRAVEL) return
-      const d = Math.sqrt(d2)
-      if (d > SNAP) {
-        const k = MAX_TRAVEL / d
-        this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
-        // damp toward chassis velocity instead of overwriting — a hard
-        // velocity reset mid-motion injects constraint-fighting energy
+      let lat = cos * ex + sin * ey // fore/aft along the chassis
+      let vert = -sin * ex + cos * ey // suspension axis (down)
+      let changed = false
+      let hard = false
+      if (lat > LAT_MAX) { lat = LAT_MAX; changed = true }
+      else if (lat < -LAT_MAX) { lat = -LAT_MAX; changed = true }
+      if (vert < -COMPRESS_MAX) {
+        // wheel pushed up into the frame — hard bump stop, no ease
+        changed = true
+        if (vert < -VERT_SNAP) hard = true
+        vert = -COMPRESS_MAX
+      } else if (vert > VERT_TRAVEL) {
+        // stretched below the swingarm — keep the generous soft travel
+        changed = true
+        if (vert > VERT_SNAP) { vert = VERT_TRAVEL; hard = true } // reseat
+        else vert = VERT_TRAVEL + (vert - VERT_TRAVEL) * 0.65 // ease 35% of excess
+      }
+      if (!changed) return
+      // recompose the clamped error back into world space
+      const nex = cos * lat - sin * vert
+      const ney = sin * lat + cos * vert
+      this.matter.body.setPosition(wheel, { x: sx + nex, y: sy + ney })
+      // Only reseats damp velocity toward the chassis; a hard reset on every
+      // small nudge would inject constraint-fighting energy and read as jitter.
+      if (hard) {
         this.matter.body.setVelocity(wheel, {
           x: (wheel.velocity.x + this.chassis.velocity.x) * 0.5,
           y: (wheel.velocity.y + this.chassis.velocity.y) * 0.5,
         })
-      } else {
-        // Soft ease of the excess, position only. Runs during flips too — the
-        // socket target rotates with the chassis so gentle easing follows the
-        // spin instead of fighting it (crash tumbles previously scattered the
-        // wheels because correction was disabled whenever the bike rotated).
-        const k = 1 - 0.35 * (1 - MAX_TRAVEL / d)
-        this.matter.body.setPosition(wheel, { x: sx + ex * k, y: sy + ey * k })
       }
     }
     fix(this.wheelBack, BACK_DX)
@@ -1222,6 +1252,11 @@ export class OrnnScene extends Phaser.Scene {
     const cInX = w / 2, cInY = h / 2
     const cOutX = Math.round(w / 2), cOutY = Math.round(h / 2)
     const placeUI = (txt: Phaser.GameObjects.Text, X: number, Y: number): void => {
+      // Snap to whole screen pixels: the chrome is scaled by 1/zoom, so at
+      // fractional (zoomed-out / high-speed) zoom an unrounded target lands on a
+      // sub-pixel position and the glyphs render soft/blurry. Rounding the target
+      // keeps the anchor on an integer pixel so text stays crisp at every zoom.
+      X = Math.round(X); Y = Math.round(Y)
       txt.setScale(inv).setPosition(cInX + (X - cOutX) * inv, cInY + (Y - cOutY) * inv)
     }
 
@@ -1235,7 +1270,7 @@ export class OrnnScene extends Phaser.Scene {
     let ai = 0
     if (this.axis) {
       for (let i = 0; i < this.axis.levelY.length; i++) {
-        const py = sy(this.axis.levelY[i])
+        const py = Math.round(sy(this.axis.levelY[i])) // integer px: crisp gridline + label at any zoom
         if (py < 60 || py > h - 30) continue
         g.lineStyle(1, CN.grid, 1)
         g.lineBetween(0, py, w - 64, py)
@@ -1258,7 +1293,7 @@ export class OrnnScene extends Phaser.Scene {
       if (!m.dayBoundary) continue
       if (m.x < left) continue
       if (m.x > right) break
-      const px = sx(m.x)
+      const px = Math.round(sx(m.x))
       if (px - lastLX < 70 || px < 20 || px > w - 70) continue
       lastLX = px
       const txt = this.dateTexts[di++]
@@ -1272,7 +1307,7 @@ export class OrnnScene extends Phaser.Scene {
 
     // current-price chip + dotted level line at the bike price
     const wy = t.groundY(bikeX)
-    const chipY = sy(wy) // glued to the bike's price level on the chart
+    const chipY = Math.round(sy(wy)) // glued to the bike's price level, snapped to integer px
     if (chipY > 40 && chipY < h - 20) {
       const price = priceAtX(t.markers, bikeX)
       // dotted horizontal line
@@ -1281,7 +1316,7 @@ export class OrnnScene extends Phaser.Scene {
       // white chip
       const label = fmtAxis(price)
       this.chipText.setText(label).setVisible(true)
-      const cw = this.chipText.width + 12
+      const cw = Math.round(this.chipText.width) + 12
       const cx = w - cw - 6
       g.fillStyle(0xffffff, 1)
       g.fillRect(cx, chipY - 8, cw, 16) // pixel theme: square chip
