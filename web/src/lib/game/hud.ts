@@ -7,7 +7,10 @@ import type { Category } from './data'
 import { RANGE_LABELS, categoryOf, defaultRange } from './data'
 
 const CSS = `
-#ornn-hud, #ornn-hud * { box-sizing: border-box; margin: 0; padding: 0; }
+/* No padding:0 on descendants: the id+universal reset (specificity 1-0-0)
+   would beat every class-only padding rule below (0-1-0) and flatten them. */
+#ornn-hud, #ornn-hud * { box-sizing: border-box; margin: 0; }
+#ornn-hud { padding: 0; }
 #ornn-hud {
   position: fixed; inset: 0; pointer-events: none; z-index: 10;
   font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
@@ -31,7 +34,7 @@ const CSS = `
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
   font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
-  color: ${C.dim}; padding: 5px 12px; transition: color .12s, border-color .12s;
+  color: ${C.dim}; padding: 9px 18px; transition: color .12s, border-color .12s;
 }
 .oh-cat:hover { color: #c8c8c8; }
 .oh-cat.active { color: ${C.text}; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
@@ -40,7 +43,7 @@ const CSS = `
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
   font-family: inherit; font-size: 13px; line-height: 1.4; color: ${C.dim};
-  padding: 6px 14px; transition: color .12s, border-color .12s;
+  padding: 10px 20px; transition: color .12s, border-color .12s;
 }
 .oh-tab:hover { color: #c8c8c8; }
 .oh-tab.active { color: ${C.text}; font-weight: 600; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
