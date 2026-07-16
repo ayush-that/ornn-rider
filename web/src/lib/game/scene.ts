@@ -232,6 +232,7 @@ export class OrnnScene extends Phaser.Scene {
 
   // left-edge containment wall (always in the world, not windowed) + kill-plane
   private leftWall: Body | null = null
+  private rightWall: Body | null = null
   private killY = Infinity
   private killed = false
 
@@ -436,6 +437,7 @@ export class OrnnScene extends Phaser.Scene {
     this.segXs = []
     this.loIdx = this.hiIdx = 0
     if (this.leftWall) { this.matter.world.remove(this.leftWall); this.leftWall = null }
+    if (this.rightWall) { this.matter.world.remove(this.rightWall); this.rightWall = null }
     this.killY = Infinity
     this.killed = false
     // remove bike bodies + constraints
@@ -488,13 +490,17 @@ export class OrnnScene extends Phaser.Scene {
   // bike can never reverse past the lead-in into open space. Given a distinct
   // 'wall' label so it doesn't register as grounded/head contact.
   private buildLeftWall(terrain: Terrain): void {
-    const cx = terrain.startX - WALL_THICKNESS * 0.5
     const cy = (terrain.minY + terrain.maxY) * 0.5
     const height = (terrain.maxY - terrain.minY) + 4000 // tall enough to never clear
-    this.leftWall = this.matter.bodies.rectangle(cx, cy, WALL_THICKNESS, height, {
-      isStatic: true, label: 'wall', friction: 0, frictionStatic: 0, restitution: 0,
-    })
-    this.matter.world.add(this.leftWall)
+    const wall = (cx: number): Body =>
+      this.matter.bodies.rectangle(cx, cy, WALL_THICKNESS, height, {
+        isStatic: true, label: 'wall', friction: 0, frictionStatic: 0, restitution: 0,
+      })
+    // Both edges: reversing off the lead-in or riding past the lead-out would
+    // otherwise be an endless fall (the finish flag sits before the terrain end).
+    this.leftWall = wall(terrain.startX - WALL_THICKNESS * 0.5)
+    this.rightWall = wall(terrain.points[terrain.points.length - 1].x + WALL_THICKNESS * 0.5)
+    this.matter.world.add([this.leftWall, this.rightWall])
     // Kill-plane: any freefall this far below the lowest terrain point is a crash.
     this.killY = terrain.maxY + KILL_DROP
     this.killed = false
