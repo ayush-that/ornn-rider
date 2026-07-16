@@ -355,6 +355,14 @@ export class OrnnScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The bike/rider sprites live at a non-integer scale (world 1.13 × camera
+    // zoom), so global NEAREST filtering makes their pixels crawl in motion —
+    // which reads as blur under acceleration. LINEAR keeps their edges stable;
+    // coins/flag stay NEAREST (they sit still, crawl never shows).
+    for (const key of ['bike', 'rider', 'ragdoll', 'wheel']) {
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR)
+    }
+
     this.cameras.main.setBackgroundColor(CN.bg0)
 
     this.makeParticleTextures()
