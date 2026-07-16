@@ -25,8 +25,8 @@ const CSS = `
 }
 
 /* ---- header (no top navbar; category selector + tabs + price only) ---- */
-#oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 18px 24px 12px; }
-#oh-cats { display: flex; gap: 8px; margin-bottom: 10px; }
+#oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 26px 28px 12px; }
+#oh-cats { display: flex; gap: 8px; margin-bottom: 16px; }
 .oh-cat {
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
@@ -46,7 +46,8 @@ const CSS = `
 .oh-tab.active { color: ${C.text}; font-weight: 600; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
 #oh-tabline { display: none; }
 
-#oh-priceblock { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 2px 0; }
+#oh-priceblock { display: flex; align-items: center; gap: 14px; margin-top: 20px; padding: 2px 0; }
+#oh-datetime { margin-top: 6px; font-size: 11px; color: #8a8a8a; letter-spacing: 0.05em; min-height: 14px; }
 #oh-price { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
 #oh-price .oh-hr { font-size: 14px; font-weight: 400; color: ${C.dim}; margin-left: 6px; }
 #oh-change {
@@ -160,6 +161,9 @@ function fmtBest(px: number): string {
   return px > 0 ? `${Math.round(px / 10).toLocaleString('en-US')} m` : '—'
 }
 
+const HDR_DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const HDR_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+
 export function createHud(
   root: HTMLElement,
   categories: Category[],
@@ -191,7 +195,8 @@ export function createHud(
       <div id="oh-price" class="oh-mono">$0.00<span class="oh-hr">/hr</span></div>
       <div id="oh-change" class="up oh-mono">+0.00%</div>
       <div id="oh-ranges"></div>
-    </div>`
+    </div>
+    <div id="oh-datetime" class="oh-mono"></div>`
   hud.appendChild(header)
 
   const catsEl = header.querySelector<HTMLElement>('#oh-cats')!
@@ -199,6 +204,7 @@ export function createHud(
   const priceEl = header.querySelector<HTMLElement>('#oh-price')!
   const changeEl = header.querySelector<HTMLElement>('#oh-change')!
   const rangesEl = header.querySelector<HTMLElement>('#oh-ranges')!
+  const datetimeEl = header.querySelector<HTMLElement>('#oh-datetime')!
 
   // Category selector (COMPUTE / MEMORY / TOKENS). Picking one jumps to that
   // category's first track at its default range.
@@ -265,10 +271,15 @@ export function createHud(
     for (const [id, b] of pillBtns) b.classList.toggle('active', id === range)
   }
 
-  function setHeader(price: number, changePct: number): void {
+  function setPrice(price: number): void {
     const unit = curCat.unit
     const decimals = price < 10 ? 3 : 2
     priceEl.innerHTML = `$${price.toFixed(decimals)}<span class="oh-hr">${unit}</span>`
+  }
+
+  function setHeader(price: number, changePct: number): void {
+    setPrice(price)
+    datetimeEl.textContent = ''
     const up = changePct >= 0
     changeEl.textContent = `${up ? '+' : ''}${changePct.toFixed(2)}%`
     changeEl.className = `${up ? 'up' : 'down'} oh-mono`
@@ -330,12 +341,26 @@ export function createHud(
   // dirty-check caches
   let lastDist = -1, lastCred = -1, lastBest = -1, lastSpeed = -1, hintHidden = false
   let lastNitro = -1, lastArmed = false
+  let lastLivePrice = -1, lastLiveT = -1
 
   function update(state: GameState): void {
     if (!state.terrain || !state.bike) return
     // Hide the ride hint once the run has begun.
     if (state.started && !hintHidden) { hintHidden = true; hint.style.opacity = '0' }
     if (!state.started && hintHidden) { hintHidden = false; hint.style.opacity = '1' }
+
+    // Live ticker: header shows the price/date under the bike as you ride.
+    const lp = Math.round(state.livePrice * 1000)
+    if (lp !== lastLivePrice && state.livePrice > 0) {
+      lastLivePrice = lp
+      setPrice(state.livePrice)
+    }
+    if (state.liveTimeMs !== lastLiveT) {
+      lastLiveT = state.liveTimeMs
+      datetimeEl.textContent = state.liveTimeMs
+        ? `${HDR_DATE_FMT.format(state.liveTimeMs)} · ${HDR_TIME_FMT.format(state.liveTimeMs)}`
+        : ''
+    }
 
     const dist = Math.round(state.distance / 10)
     if (dist !== lastDist) { lastDist = dist; sDist.textContent = `${dist} m` }

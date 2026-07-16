@@ -85,11 +85,8 @@ function approach(cur: number, target: number, step: number): number {
   return target
 }
 
-const DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 const DAY_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
-const TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 function fmtAxis(v: number): string { return v >= 100 ? v.toFixed(1) : v.toFixed(2) }
-function fmtPrice(v: number): string { return '$' + v.toFixed(2) }
 
 // Everything the scene needs from game.ts (shared, mutated in place).
 export interface GameCtx {
@@ -190,9 +187,6 @@ export class OrnnScene extends Phaser.Scene {
   private axisTexts: Phaser.GameObjects.Text[] = []
   private dateTexts: Phaser.GameObjects.Text[] = []
   private chipText!: Phaser.GameObjects.Text
-  private tipPrice!: Phaser.GameObjects.Text
-  private tipDate!: Phaser.GameObjects.Text
-  private tipTime!: Phaser.GameObjects.Text
 
   // sprites
   private bikeSprite!: Phaser.GameObjects.Image
@@ -258,9 +252,6 @@ export class OrnnScene extends Phaser.Scene {
   // fixed-timestep accumulator
   private acc = 0
 
-  // smooth tooltip follow
-  private tipX = -1
-  private tipY = -1
 
   // camera shake (ported from effects.ts)
   private shakeMag = 0
@@ -310,12 +301,6 @@ export class OrnnScene extends Phaser.Scene {
         .setScrollFactor(0).setDepth(21).setOrigin(0.5, 1).setVisible(false))
     }
     this.chipText = this.add.text(0, 0, '', { fontFamily: MONO, fontSize: '11px', color: '#050505' })
-      .setScrollFactor(0).setDepth(22).setOrigin(0.5, 0.5).setVisible(false)
-    this.tipPrice = this.add.text(0, 0, '', { fontFamily: SANS, fontSize: '20px', fontStyle: '600', color: '#ffffff' })
-      .setScrollFactor(0).setDepth(22).setOrigin(0.5, 0.5).setVisible(false)
-    this.tipDate = this.add.text(0, 0, '', { fontFamily: SANS, fontSize: '11px', color: '#8a8a8a' })
-      .setScrollFactor(0).setDepth(22).setOrigin(0.5, 0.5).setVisible(false)
-    this.tipTime = this.add.text(0, 0, '', { fontFamily: SANS, fontSize: '10px', color: '#6a6a6a' })
       .setScrollFactor(0).setDepth(22).setOrigin(0.5, 0.5).setVisible(false)
 
     this.makeEmitters()
@@ -592,7 +577,6 @@ export class OrnnScene extends Phaser.Scene {
     this.ragdollSprite.setVisible(false)
     this.riderSprite.setVisible(true)
     this.acc = 0
-    this.tipX = this.tipY = -1
     const p = this.chassis.position
     state.camera.x = p.x
     state.camera.y = p.y - 40
@@ -1183,25 +1167,43 @@ export class OrnnScene extends Phaser.Scene {
     const h = this.scale.height
     const sx = (wx: number): number => (wx - wv.x) * zoom
     const sy = (wy: number): number => (wy - wv.y) * zoom
-    // Axis mapping at FIXED zoom: the price axis (level lines, labels, chip)
-    // tracks the camera's vertical pan but ignores dynamic zoom, so the
-    // numbers on the right stay put during nitro/air/crash zoom punches.
-    const syA = (wy: number): number => h / 2 + (wy - cam.midPoint.y)
+    // The main camera applies its dynamic zoom (speed/air/nitro/crash) to every
+    // object it renders — even setScrollFactor(0) chrome — as
+    //   screen = cOut + zoom * (pos - cIn)
+    // where cIn is the screen centre and cOut is that centre with Phaser's
+    // integer-floored output origin. That scaled the axis font and drifted the
+    // right-edge label column sideways as zoom changed. We cancel it: render the
+    // whole chrome layer in identity screen space by counter-scaling 1/zoom
+    // about the centre, so labels keep a fixed screen X, fixed font size, and no
+    // horizontal drift, while their Y still tracks each price level on the
+    // (zooming) chart via sy(). placeUI positions a text so its anchor lands at
+    // the given true screen (X, Y); g is transformed so its draws use raw screen
+    // coordinates too.
+    const inv = 1 / zoom
+    const cInX = w / 2, cInY = h / 2
+    const cOutX = Math.round(w / 2), cOutY = Math.round(h / 2)
+    const placeUI = (txt: Phaser.GameObjects.Text, X: number, Y: number): void => {
+      txt.setScale(inv).setPosition(cInX + (X - cOutX) * inv, cInY + (Y - cOutY) * inv)
+    }
 
     const g = this.chromeGfx
+    g.setScale(inv).setPosition(cInX - cOutX * inv, cInY - cOutY * inv)
     g.clear()
 
-    // horizontal price-level grid lines + right-edge labels (fixed-zoom chrome)
+    // horizontal price-level grid lines + right-edge labels. Each line's screen
+    // Y tracks its price level on the (zooming) chart via sy(); placeUI pins the
+    // label to a fixed screen X and fixed font size in the identity chrome layer.
     let ai = 0
     if (this.axis) {
       for (let i = 0; i < this.axis.levelY.length; i++) {
-        const py = syA(this.axis.levelY[i])
+        const py = sy(this.axis.levelY[i])
         if (py < 60 || py > h - 30) continue
         g.lineStyle(1, CN.grid, 1)
         g.lineBetween(0, py, w - 64, py)
         const txt = this.axisTexts[ai++]
         if (!txt) break
-        txt.setVisible(true).setText(fmtAxis(this.axis.levelV[i])).setPosition(w - 10, py)
+        txt.setVisible(true).setText(fmtAxis(this.axis.levelV[i]))
+        placeUI(txt, w - 10, py)
       }
     }
     for (let i = ai; i < this.axisTexts.length; i++) this.axisTexts[i].setVisible(false)
@@ -1222,7 +1224,8 @@ export class OrnnScene extends Phaser.Scene {
       lastLX = px
       const txt = this.dateTexts[di++]
       if (!txt) break
-      txt.setVisible(true).setText(DAY_FMT.format(m.t)).setPosition(px, h - 10)
+      txt.setVisible(true).setText(DAY_FMT.format(m.t))
+      placeUI(txt, px, h - 10)
     }
     for (let i = di; i < this.dateTexts.length; i++) this.dateTexts[i].setVisible(false)
 
@@ -1230,7 +1233,7 @@ export class OrnnScene extends Phaser.Scene {
 
     // current-price chip + dotted level line at the bike price
     const wy = t.groundY(bikeX)
-    const chipY = syA(wy) // fixed-zoom axis mapping, aligned with the labels
+    const chipY = sy(wy) // glued to the bike's price level on the chart
     if (chipY > 40 && chipY < h - 20) {
       const price = priceAtX(t.markers, bikeX)
       // dotted horizontal line
@@ -1243,48 +1246,25 @@ export class OrnnScene extends Phaser.Scene {
       const cx = w - cw - 6
       g.fillStyle(0xffffff, 1)
       g.fillRect(cx, chipY - 8, cw, 16) // pixel theme: square chip
-      this.chipText.setPosition(cx + cw / 2, chipY)
+      placeUI(this.chipText, cx + cw / 2, chipY)
     } else {
       this.chipText.setVisible(false)
     }
 
-    // floating tooltip card above the bike (smooth follow)
+    // live price + timestamp under the bike → shown in the DOM header (no
+    // floating tooltip card; the header carries this now).
     if (this.built) {
       const bx = this.chassis.position.x
-      const by = this.chassis.position.y
-      const targetX = sx(bx)
-      const targetY = sy(by) - 92
-      if (this.tipX < 0) { this.tipX = targetX; this.tipY = targetY }
-      else { this.tipX += (targetX - this.tipX) * 0.12; this.tipY += (targetY - this.tipY) * 0.12 }
-      const cardW = 116, cardH = 68
-      let cx = this.tipX - cardW / 2
-      let cy = this.tipY - cardH
-      cx = Math.max(8, Math.min(w - cardW - 66, cx))
-      cy = Math.max(70, cy)
-      const price = priceAtX(t.markers, bx)
+      const state = this.ctx.state
+      state.livePrice = priceAtX(t.markers, bx)
       const m = markerAtX(t.markers, bx)
-      // pixel theme: square card, hard offset shadow, 2px border
-      g.fillStyle(0x000000, 0.55)
-      g.fillRect(cx + 4, cy + 4, cardW, cardH)
-      g.fillStyle(CN.panel, 1)
-      g.fillRect(cx, cy, cardW, cardH)
-      g.lineStyle(2, 0x2a2a2a, 1)
-      g.strokeRect(cx + 1, cy + 1, cardW - 2, cardH - 2)
-      const midX = cx + cardW / 2
-      this.tipPrice.setVisible(true).setText(fmtPrice(price)).setPosition(midX, cy + 20)
-      if (m) {
-        this.tipDate.setVisible(true).setText(DATE_FMT.format(m.t)).setPosition(midX, cy + 40)
-        this.tipTime.setVisible(true).setText(TIME_FMT.format(m.t)).setPosition(midX, cy + 55)
-      } else {
-        this.tipDate.setVisible(false)
-        this.tipTime.setVisible(false)
-      }
+      state.liveTimeMs = m ? m.t : 0
       // white marker dot on the line at the bike x
       const dotY = sy(t.groundY(bx))
       g.fillStyle(0xf5f5f5, 1)
-      g.fillCircle(targetX, dotY, 4)
+      g.fillCircle(sx(bx), dotY, 4)
       g.lineStyle(1.5, CN.bg0, 1)
-      g.strokeCircle(targetX, dotY, 4)
+      g.strokeCircle(sx(bx), dotY, 4)
     }
 
     // speed lines
