@@ -396,7 +396,7 @@ export function createHud(
         <div class="oh-rescell"><div class="oh-k">Flips</div><div class="oh-v oh-mono">${state.flips}</div></div>
         <div class="oh-rescell"><div class="oh-k">Air time</div><div class="oh-v oh-mono">${(state.airTimeMs / 1000).toFixed(1)}s</div></div>
       </div>
-      <div class="oh-btnrow"><button type="button" class="oh-btn primary">Retry (R)</button></div>`
+      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Retry (R)'}</button></div>`
     card.querySelector<HTMLButtonElement>('.oh-btn')!.addEventListener('click', onRetry)
     results.appendChild(card)
     results.classList.remove('oh-hidden')
