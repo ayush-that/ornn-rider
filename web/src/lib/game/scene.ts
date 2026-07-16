@@ -45,7 +45,7 @@ const BIKE_ORIGIN_X = 63 / BIKE_SPRITE_W // midpoint of axle x's (13.5, 112.5)
 const BIKE_ORIGIN_Y = (BIKE_AXLE_Y - WHEEL_DY / BIKE_SCALE) / BIKE_SPRITE_H // ≈ 0.7467
 
 // --- Drive tuning (per 60fps physics step) ---------------------------------
-const MAX_WHEEL_AV = 1.15
+const MAX_WHEEL_AV = 1.5
 const WHEEL_ACCEL = 0.12
 const BRAKE_DECEL = 0.09
 const REVERSE_TARGET_AV = -0.28
@@ -91,7 +91,7 @@ const NITRO_TRICKLE = 0.02 // per second, always
 const NITRO_PER_COIN = 0.04
 const NITRO_PER_FLIP = 0.2
 const NITRO_ARM = 0.10 // min charge to (re)start a boost — hysteresis vs empty-tank stutter
-const NITRO_FORCE = 0.0027 // ~3x the peak trend-wind force per step
+const NITRO_FORCE = 0.0038 // ~4x the peak trend-wind force per step
 
 // --- Tricks & streak scoring -----------------------------------------------
 // Every trick is a micro-interaction: a floating popup + a bit of camera juice.
@@ -117,7 +117,7 @@ const GROUND_TRICK_GRACE = 350
 // accumulate above HI, only reset below LO, hold in between — so a single bump
 // dip doesn't wipe a near-complete run.
 const SPEED_DEMON_MS = 3000, SPEED_DEMON_PTS = 25
-const SPEED_DEMON_HI = 620, SPEED_DEMON_LO = 430
+const SPEED_DEMON_HI = 800, SPEED_DEMON_LO = 560
 const SPEED_SMOOTH = 0.12 // EMA weight per physics step
 const FLIP_PTS = 25
 // Named one-shot combos (amber popup, big scale, strong shake). Flat bonuses,
@@ -950,7 +950,7 @@ export class OrnnScene extends Phaser.Scene {
   private enforceBikeIntegrity(): void {
     const MAX_FALL = 20 // px/step terminal velocity — capped low so a long drop
     // lands with a survivable impulse instead of blowing the wheels out of socket
-    const MAX_HORIZ = 40 // px/step terminal horizontal speed
+    const MAX_HORIZ = 58 // px/step terminal horizontal speed
     for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
       const vx = clamp(b.velocity.x, -MAX_HORIZ, MAX_HORIZ)
       const vy = Math.min(b.velocity.y, MAX_FALL)
