@@ -1,6 +1,6 @@
-# Ornn Rider
+# Engineer Boyfriend
 
-Hill-climb bike game where the terrain is real market data from the [Ornn Data API](https://ornn-data.mintlify.app): GPU rental indices ($/hr), memory spot prices ($/unit), and per-lab token price indices ($/Mtok). Ride the chart, collect coins, post your run to the leaderboard with your X account.
+Hill-climb bike game (live at https://engineerboyfriend.com) where the terrain is real market data from the [Ornn Data API](https://ornn-data.mintlify.app): GPU rental indices ($/hr), memory spot prices ($/unit), and per-lab token price indices ($/Mtok). Ride the chart, collect coins, post your run to the leaderboard with your X account.
 
 ## Stack
 

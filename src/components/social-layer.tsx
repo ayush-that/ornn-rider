@@ -40,12 +40,23 @@ function loadPendingRun(): RunResult | null {
   }
 }
 
-export function SocialLayer({ lastRun }: { lastRun: RunResult | null }) {
+export function SocialLayer({
+  lastRun,
+  boardSignal = 0,
+}: {
+  lastRun: RunResult | null;
+  boardSignal?: number;
+}) {
   const { signIn, signOut } = useAuthActions();
   const viewer = useQuery(api.leaderboard.viewer);
   const submitRun = useMutation(api.leaderboard.submitRun);
 
   const [boardOpen, setBoardOpen] = useState(false);
+
+  // External open requests (e.g. the start page's LEADERBOARD button).
+  useEffect(() => {
+    if (boardSignal > 0) setBoardOpen(true);
+  }, [boardSignal]);
   const [posted, setPosted] = useState<RunResult | null>(null);
   const submittedRef = useRef<RunResult | null>(null);
 
