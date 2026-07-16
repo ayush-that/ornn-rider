@@ -108,6 +108,8 @@ export function startGame(
     started: false,
     latestPrice: 0,
     latestChangePct: 0,
+    livePrice: 0,
+    liveTimeMs: 0,
     track: null,
     terrain: null,
     bike: null,

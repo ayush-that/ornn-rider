@@ -89,6 +89,8 @@ export interface GameState {
   started: boolean // first throttle input received — the run has begun
   latestPrice: number // most-recent series value (header ticker)
   latestChangePct: number // day-over-day change of the latest value (header ticker)
+  livePrice: number // series value under the bike right now (header live ticker)
+  liveTimeMs: number // timestamp of the marker under the bike, 0 = unknown
   track: Track | null
   terrain: Terrain | null
   bike: BikeView | null
