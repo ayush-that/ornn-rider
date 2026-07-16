@@ -614,10 +614,10 @@ export class OrnnScene extends Phaser.Scene {
       }
       const m = markers[i]
       const c = this.add.image(m.x, m.y - 40, 'coin').setDepth(4)
-      if (value === -1) c.setScale(1.05).setTint(0x5ad1ff) // nitro: cyan canister
-      else if (value === 50) c.setScale(1.1).setTint(0xffd766)
-      else if (value === 20) c.setScale(20 / 24)
-      else c.setScale(0.62)
+      // Uniform size for every pickup; tint alone tells them apart.
+      c.setScale(20 / 24)
+      if (value === -1) c.setTint(0x5ad1ff) // nitro: cyan canister
+      else if (value === 50) c.setTint(0xffd766)
       this.coinSprites.push(c)
     }
   }
@@ -686,7 +686,8 @@ export class OrnnScene extends Phaser.Scene {
     const sx = resume
       ? clamp(this.chassis.position.x, t.startX + SPAWN_DX, t.endX - 200)
       : t.startX + SPAWN_DX
-    const sy = t.groundY(sx) - SPAWN_DY
+    // Resume drops the bike in from a little above the ground for a soft re-entry.
+    const sy = t.groundY(sx) - (resume ? SPAWN_DY + 70 : SPAWN_DY)
     this.bikeReset(sx, sy)
     if (resume) this.clearRunFlags()
     else this.resetRunState(sx)
@@ -775,16 +776,19 @@ export class OrnnScene extends Phaser.Scene {
     const airborne = !this.grounded
 
     if (playing) {
-      const fwd = this.down('ArrowRight') || this.down('KeyD') || this.down('KeyW') || this.down('Space') || this.ctx.touch.throttle
-      const brk = this.down('ArrowLeft') || this.down('KeyS') || this.ctx.touch.brake
+      // Control scheme: W/↑/Space/right-half = gas · A/←/left-half = wheelie
+      // (lean back) · D/→ = nose dive (lean forward) · S/↓ = nothing.
+      const fwd = this.down('KeyW') || this.down('ArrowUp') || this.down('Space') || this.ctx.touch.throttle
+      const leanBack = this.down('KeyA') || this.down('ArrowLeft') || this.ctx.touch.brake
+      const leanFwd = this.down('KeyD') || this.down('ArrowRight')
       if (fwd) state.started = true
-      this.throttle(fwd ? 1 : brk ? -1 : 0)
+      this.throttle(fwd ? 1 : 0)
 
       // Static friction: the suspension springs micro-jitter the bodies a few
       // px/s forever, so an untouched bike never reads 0 km/h. With no drive
       // input, grounded and nearly still, park it. Slopes still roll — gravity
       // pushes past the threshold within a step or two.
-      this.parked = !fwd && !brk && this.grounded && this.chassis.speed < 0.6
+      this.parked = !fwd && this.grounded && this.chassis.speed < 0.6
       if (this.parked) {
         const B = this.matter.body
         for (const b of [this.chassis, this.wheelBack, this.wheelFront, this.riderHead]) {
@@ -795,18 +799,10 @@ export class OrnnScene extends Phaser.Scene {
       }
 
       const tipped = this.tilt() > TIPPED_ANGLE
-      const up = this.down('ArrowUp')
-      const down = this.down('ArrowDown')
-      const auxBack = this.down('KeyA') || this.down('ArrowLeft')
-      const auxFwd = this.down('KeyD') || this.down('ArrowRight')
-      if (up || down) {
-        // dedicated flip keys: fast in the air (and for tipped recovery),
-        // gentle weight-shift on the ground
-        this.lean(down ? 1 : -1, airborne || tipped ? FLIP_LEAN : GROUND_LEAN)
-      } else if ((airborne || tipped) && (auxBack || auxFwd)) {
-        // throttle/brake double as lean: subtle correction only, except when
-        // tipped past ride angles where they become recovery controls
-        this.lean(auxFwd ? 1 : -1, tipped ? FLIP_LEAN : AIR_LEAN)
+      if (leanBack || leanFwd) {
+        // full flip strength in the air (and for tipped recovery); gentle
+        // weight-shift/wheelie assist while grounded
+        this.lean(leanFwd ? 1 : -1, airborne || tipped ? FLIP_LEAN : GROUND_LEAN)
       }
 
       // Trend tailwind: a strong bull market pushes you forward.
@@ -1160,10 +1156,16 @@ export class OrnnScene extends Phaser.Scene {
     this.ctx.audio.setEngine(this._rpm, this.throttleAudioOn())
 
     if ((state.phase === 'crashed' || state.phase === 'finished') && !this.resultsShown) {
-      const wait = state.phase === 'crashed' ? 1200 : 700
+      const wait = state.phase === 'crashed' ? 1100 : 700
       if (state.timeMs - this.outcomeAt >= wait) {
         this.resultsShown = true
-        this.ctx.hud.showResults(state, () => this.restartRun())
+        if (state.phase === 'crashed') {
+          // No results card on a crash: watch the ragdoll for a beat, then the
+          // bike drops back in right where you died and the run just continues.
+          this.restartRun()
+        } else {
+          this.ctx.hud.showResults(state, () => this.restartRun())
+        }
       }
     }
   }
@@ -1171,7 +1173,7 @@ export class OrnnScene extends Phaser.Scene {
   private throttleAudioOn(): boolean {
     const state = this.ctx.state
     if (state.phase !== 'playing' || this.ctx.isMuted()) return false
-    return this.down('ArrowRight') || this.down('KeyD') || this.down('KeyW') || this.down('Space') || this.ctx.touch.throttle
+    return this.down('KeyW') || this.down('ArrowUp') || this.down('Space') || this.ctx.touch.throttle
   }
 
   private updateCamera(): void {
