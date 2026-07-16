@@ -37,11 +37,11 @@ const HEAD_R = 11
 //   origin maps sprite pixel (252, 263) → chassis centre, so the two axle
 //   pixels land on the wheel centres at (±56, +18) from the chassis. Solving
 //   (263 - oy*267)*scale = WHEEL_DY gives origin_y ≈ 0.7467.
-const BIKE_SPRITE_W = 512
-const BIKE_SPRITE_H = 267
-const BIKE_AXLE_Y = 263 // avg of rear (261) / front (265) axle y in sprite space
-const BIKE_SCALE = 112 / 396 // ≈ 0.28283
-const BIKE_ORIGIN_X = 252 / BIKE_SPRITE_W // ≈ 0.49219 (midpoint of the two axle x's)
+const BIKE_SPRITE_W = 128
+const BIKE_SPRITE_H = 67
+const BIKE_AXLE_Y = 65.75 // avg axle y in 128x67 pixel-art sprite space (orig/4)
+const BIKE_SCALE = 112 / 99 // physics wheelbase / pixel-sprite wheelbase (396/4)
+const BIKE_ORIGIN_X = 63 / BIKE_SPRITE_W // midpoint of axle x's (13.5, 112.5)
 const BIKE_ORIGIN_Y = (BIKE_AXLE_Y - WHEEL_DY / BIKE_SCALE) / BIKE_SPRITE_H // ≈ 0.7467
 
 // --- Drive tuning (per 60fps physics step) ---------------------------------
@@ -178,8 +178,8 @@ function pointIndex(pts: { x: number; y: number }[], x: number): number {
   return lo
 }
 
-const MONO = '"SF Mono", ui-monospace, Menlo, monospace'
-const SANS = 'ui-sans-serif, system-ui, -apple-system, sans-serif'
+const MONO = '"Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif'
+const SANS = '"Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif'
 
 export class OrnnScene extends Phaser.Scene {
   private ctx!: GameCtx
@@ -273,12 +273,12 @@ export class OrnnScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('bike', '/assets/bike-solo.png')
-    this.load.image('rider', '/assets/rider.png')
-    this.load.image('ragdoll', '/assets/rider-ragdoll.png')
-    this.load.image('wheel', '/assets/wheel.png')
-    this.load.image('coin', '/assets/coin.png')
-    this.load.image('flag', '/assets/flag.png')
+    this.load.image('bike', '/assets/px/bike-solo.png')
+    this.load.image('rider', '/assets/px/rider.png')
+    this.load.image('ragdoll', '/assets/px/rider-ragdoll.png')
+    this.load.image('wheel', '/assets/px/wheel.png')
+    this.load.image('coin', '/assets/px/coin.png')
+    this.load.image('flag', '/assets/px/flag.png')
   }
 
   create(): void {
@@ -290,13 +290,13 @@ export class OrnnScene extends Phaser.Scene {
     this.worldGfx = this.add.graphics().setDepth(0)
 
     // Bike sprites — created hidden, positioned once the world is built.
-    this.wheelBackSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 256).setVisible(false)
-    this.wheelFrontSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 256).setVisible(false)
+    this.wheelBackSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 32).setVisible(false)
+    this.wheelFrontSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 32).setVisible(false)
     this.bikeSprite = this.add.image(0, 0, 'bike').setDepth(6).setOrigin(BIKE_ORIGIN_X, BIKE_ORIGIN_Y).setScale(BIKE_SCALE).setVisible(false)
     // Rider sits on the bike: origin at his hips, scaled so his torso doesn't
     // tower over the handlebars. Seat offset is derived in syncSprites().
-    this.riderSprite = this.add.image(0, 0, 'rider').setDepth(7).setOrigin(0.5, 0.66).setScale(103 / 411).setVisible(false)
-    this.ragdollSprite = this.add.image(0, 0, 'ragdoll').setDepth(7).setOrigin(0.5, 0.5).setScale(100 / 310).setVisible(false)
+    this.riderSprite = this.add.image(0, 0, 'rider').setDepth(7).setOrigin(0.5, 0.66).setScale(103 / 88).setVisible(false)
+    this.ragdollSprite = this.add.image(0, 0, 'ragdoll').setDepth(7).setOrigin(0.5, 0.5).setScale(100 / 66).setVisible(false)
 
     this.chromeGfx = this.add.graphics().setScrollFactor(0).setDepth(20)
 
@@ -546,7 +546,7 @@ export class OrnnScene extends Phaser.Scene {
   }
 
   private buildCoins(terrain: Terrain): void {
-    const scale = 20 / 128
+    const scale = 20 / 24
     for (let i = 0; i < terrain.markers.length; i++) {
       const m = terrain.markers[i]
       const c = this.add.image(m.x, m.y - 40, 'coin').setScale(scale).setDepth(4)
@@ -556,7 +556,7 @@ export class OrnnScene extends Phaser.Scene {
 
   private buildFlag(terrain: Terrain): void {
     const gy = terrain.groundY(terrain.endX)
-    this.flagSprite = this.add.image(terrain.endX, gy, 'flag').setOrigin(0.12, 0.98).setScale(120 / 308).setDepth(4)
+    this.flagSprite = this.add.image(terrain.endX, gy, 'flag').setOrigin(0.12, 0.98).setScale(120 / 67).setDepth(4)
   }
 
   private resetRunState(sx: number): void {
@@ -1084,8 +1084,8 @@ export class OrnnScene extends Phaser.Scene {
       // angle too) so he pivots about the chassis centre, not his own origin.
       // Seat anchor (204,92)+6px: settles the crouched rider INTO the bike so
       // he never reads as hovering, verified by offline composite at 0/-0.6rad.
-      const ox = (204 - 252) * BIKE_SCALE
-      const oy = (92 - BIKE_ORIGIN_Y * BIKE_SPRITE_H) * BIKE_SCALE + 6
+      const ox = (51 - 63) * BIKE_SCALE
+      const oy = (23 - BIKE_ORIGIN_Y * BIKE_SPRITE_H) * BIKE_SCALE + 6
       const rx = this.chassis.position.x + Math.cos(a) * ox - Math.sin(a) * oy
       const ry = this.chassis.position.y + Math.sin(a) * ox + Math.cos(a) * oy
       this.riderSprite.setPosition(rx, ry).setRotation(a)
@@ -1238,7 +1238,7 @@ export class OrnnScene extends Phaser.Scene {
       const cw = this.chipText.width + 12
       const cx = w - cw - 6
       g.fillStyle(0xffffff, 1)
-      g.fillRoundedRect(cx, chipY - 8, cw, 16, 3)
+      g.fillRect(cx, chipY - 8, cw, 16) // pixel theme: square chip
       this.chipText.setPosition(cx + cw / 2, chipY)
     } else {
       this.chipText.setVisible(false)
@@ -1259,8 +1259,13 @@ export class OrnnScene extends Phaser.Scene {
       cy = Math.max(70, cy)
       const price = priceAtX(t.markers, bx)
       const m = markerAtX(t.markers, bx)
+      // pixel theme: square card, hard offset shadow, 2px border
+      g.fillStyle(0x000000, 0.55)
+      g.fillRect(cx + 4, cy + 4, cardW, cardH)
       g.fillStyle(CN.panel, 1)
-      g.fillRoundedRect(cx, cy, cardW, cardH, 8)
+      g.fillRect(cx, cy, cardW, cardH)
+      g.lineStyle(2, 0x2a2a2a, 1)
+      g.strokeRect(cx + 1, cy + 1, cardW - 2, cardH - 2)
       const midX = cx + cardW / 2
       this.tipPrice.setVisible(true).setText(fmtPrice(price)).setPosition(midX, cy + 20)
       if (m) {
