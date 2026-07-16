@@ -1,10 +1,10 @@
+import type { Category } from "./data";
+import { RANGE_LABELS, categoryOf, defaultRange } from "./data";
 // DOM overlay: the Ornn chart product header (logo, GPU tabs = track selector,
 // price block + range pills) plus minimal in-run stat readouts and a restyled
 // results card. All CSS injected here.
-import type { GameState, Track, GpuRange } from './types'
-import { C } from './types'
-import type { Category } from './data'
-import { RANGE_LABELS, categoryOf, defaultRange } from './data'
+import type { GameState, Track, GpuRange } from "./types";
+import { C } from "./types";
 
 const CSS = `
 /* No padding:0 on descendants: the id+universal reset (specificity 1-0-0)
@@ -95,16 +95,31 @@ const CSS = `
 #oh-nitro .oh-track { height: 8px; border-radius: 0; background: #0c0c0c; border: 2px solid #262626; overflow: hidden; }
 #oh-nitro .oh-fill { height: 100%; width: 0%; border-radius: 0; background: ${C.amber}; transition: width .08s linear; image-rendering: pixelated; }
 #oh-nitro.armed .oh-fill { background: ${C.green}; }
-#oh-nitrobtn {
-  position: absolute; right: 24px; bottom: 118px; pointer-events: auto; cursor: pointer;
-  width: 68px; height: 68px; border-radius: 0; border: 2px solid #2a2a2a;
+/* ---- NDS-style D-pad + A button (coarse pointer only) ---- */
+#oh-dpad { position: absolute; left: 20px; bottom: 20px; width: 132px; height: 132px; display: none; }
+.oh-dpad-btn {
+  position: absolute; pointer-events: auto; cursor: pointer;
+  width: 44px; height: 44px; border-radius: 0; border: 2px solid #2a2a2a;
+  background: #1a1a1a; box-shadow: 3px 3px 0 rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  color: ${C.dim}; font-size: 16px; font-family: inherit; user-select: none;
+  transition: filter .08s, border-color .08s;
+}
+.oh-dpad-btn.pressed { filter: brightness(1.6); border-color: ${C.text}; color: ${C.text}; }
+#oh-dpad-up { left: 44px; top: 0; }
+#oh-dpad-left { left: 0; top: 44px; }
+#oh-dpad-right { left: 88px; top: 44px; }
+#oh-dpad-down { left: 44px; top: 88px; }
+#oh-abtn {
+  position: absolute; right: 24px; bottom: 20px; display: none; pointer-events: auto; cursor: pointer;
+  width: 72px; height: 72px; border-radius: 50%; border: 2px solid #2a2a2a;
   background: #0c0c0c; box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
-  color: ${C.amber}; font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
-  display: none; align-items: center; justify-content: center; user-select: none;
+  color: ${C.amber}; font-family: inherit; font-size: 20px; font-weight: 700;
+  align-items: center; justify-content: center; user-select: none;
   transition: filter .1s, border-color .1s;
 }
-#oh-nitrobtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
-@media (pointer: coarse) { #oh-nitrobtn { display: flex; } }
+#oh-abtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
+@media (pointer: coarse) { #oh-dpad { display: block; } #oh-abtn { display: flex; } }
 #oh-hint {
   position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
   font-size: 12px; color: ${C.dim}; letter-spacing: 0.05em; line-height: 1.5;
@@ -161,59 +176,93 @@ const CSS = `
   #oh-price { font-size: 20px; }
   #oh-price .oh-hr { font-size: 11px; margin-left: 4px; }
   #oh-datetime { margin-top: 3px; font-size: 10px; }
-  #oh-stats { left: 8px; bottom: 10px; gap: 5px; }
+  #oh-stats { left: 8px; bottom: 120px; gap: 5px; }
   #oh-stats .oh-stat { padding: 5px 8px; }
   #oh-stats .oh-k { font-size: 8px; }
   #oh-stats .oh-v { font-size: 12px; }
-  #oh-speed { right: 8px; bottom: 10px; padding: 5px 8px; }
+  #oh-speed { right: 8px; bottom: 120px; padding: 5px 8px; }
   #oh-speed .oh-k { font-size: 8px; }
   #oh-speed .oh-v { font-size: 13px; }
-  #oh-nitro { right: 8px; bottom: 58px; width: 90px; }
-  #oh-nitrobtn { right: 8px; bottom: 92px; width: 54px; height: 54px; }
+  #oh-nitro { right: 8px; bottom: 70px; width: 70px; }
+  #oh-dpad { left: 8px; bottom: 8px; width: 102px; height: 102px; }
+  .oh-dpad-btn { width: 34px; height: 34px; font-size: 13px; }
+  #oh-dpad-up { left: 34px; top: 0; }
+  #oh-dpad-left { left: 0; top: 34px; }
+  #oh-dpad-right { left: 68px; top: 34px; }
+  #oh-dpad-down { left: 34px; top: 68px; }
+  #oh-abtn { right: 8px; bottom: 8px; width: 54px; height: 54px; font-size: 16px; }
   #oh-hint { display: none; }
   .oh-rescard { width: 300px; padding: 16px 18px; }
   .oh-resgrid { gap: 6px; }
   .oh-rescell { padding: 8px 10px; }
 }
-`
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, html?: string): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag)
-  if (cls) e.className = cls
-  if (html !== undefined) e.innerHTML = html
-  return e
+/* ---- rotate-to-landscape prompt (coarse pointer + portrait only) ---- */
+#oh-rotate {
+  display: none; position: fixed; inset: 0; z-index: 50;
+  background: #050505; pointer-events: auto;
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  text-align: center;
+}
+.oh-rotate-icon { font-size: 48px; color: ${C.text}; }
+.oh-rotate-text { font-size: 14px; letter-spacing: 0.06em; color: ${C.dim}; padding: 0 24px; }
+@media (pointer: coarse) and (orientation: portrait) { #oh-rotate { display: flex; } }
+`;
+
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls: string,
+  html?: string,
+): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
 }
 
 function fmtBest(px: number): string {
-  return px > 0 ? `${Math.round(px / 10).toLocaleString('en-US')} m` : '—'
+  return px > 0 ? `${Math.round(px / 10).toLocaleString("en-US")} m` : "—";
 }
 
-const HDR_DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const HDR_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+const HDR_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const HDR_TIME_FMT = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
 
 export function createHud(
   root: HTMLElement,
   categories: Category[],
   onSelect: (track: Track, range: GpuRange) => void,
-  onNitro?: (active: boolean) => void,
+  onTouch: {
+    throttle: (active: boolean) => void;
+    brake: (active: boolean) => void;
+    leanFwd: (active: boolean) => void;
+    nitro: (active: boolean) => void;
+  },
 ) {
-  if (!document.getElementById('ornn-hud-style')) {
-    const style = document.createElement('style')
-    style.id = 'ornn-hud-style'
-    style.textContent = CSS
-    document.head.appendChild(style)
+  if (!document.getElementById("ornn-hud-style")) {
+    const style = document.createElement("style");
+    style.id = "ornn-hud-style";
+    style.textContent = CSS;
+    document.head.appendChild(style);
   }
 
-  const hud = el('div', '')
-  hud.id = 'ornn-hud'
-  root.appendChild(hud)
+  const hud = el("div", "");
+  hud.id = "ornn-hud";
+  root.appendChild(hud);
 
-  let curTrack: Track | null = null
-  let curCat: Category = categories[0]
+  let curTrack: Track | null = null;
+  let curCat: Category = categories[0];
 
   // ---- header ----
-  const header = el('div', '')
-  header.id = 'oh-header'
+  const header = el("div", "");
+  header.id = "oh-header";
   header.innerHTML = `
     <div id="oh-cats"></div>
     <div id="oh-tabs"></div>
@@ -222,220 +271,288 @@ export function createHud(
       <div id="oh-price" class="oh-mono">$0.00<span class="oh-hr">/hr</span></div>
       <div id="oh-ranges"></div>
     </div>
-    <div id="oh-datetime" class="oh-mono"></div>`
-  hud.appendChild(header)
+    <div id="oh-datetime" class="oh-mono"></div>`;
+  hud.appendChild(header);
 
-  const catsEl = header.querySelector<HTMLElement>('#oh-cats')!
-  const tabsEl = header.querySelector<HTMLElement>('#oh-tabs')!
-  const priceEl = header.querySelector<HTMLElement>('#oh-price')!
-  const rangesEl = header.querySelector<HTMLElement>('#oh-ranges')!
-  const datetimeEl = header.querySelector<HTMLElement>('#oh-datetime')!
+  const catsEl = header.querySelector<HTMLElement>("#oh-cats")!;
+  const tabsEl = header.querySelector<HTMLElement>("#oh-tabs")!;
+  const priceEl = header.querySelector<HTMLElement>("#oh-price")!;
+  const rangesEl = header.querySelector<HTMLElement>("#oh-ranges")!;
+  const datetimeEl = header.querySelector<HTMLElement>("#oh-datetime")!;
 
   // Category selector (COMPUTE / MEMORY / TOKENS). Picking one jumps to that
   // category's first track at its default range.
-  const catBtns = new Map<string, HTMLButtonElement>()
+  const catBtns = new Map<string, HTMLButtonElement>();
   for (const cat of categories) {
-    const b = el('button', 'oh-cat')
-    b.type = 'button'
-    b.textContent = cat.label
-    b.addEventListener('click', () => {
-      if (cat.id === curCat.id) return
-      onSelect(cat.tracks[0], defaultRange(cat.id))
-    })
-    catsEl.appendChild(b)
-    catBtns.set(cat.id, b)
+    const b = el("button", "oh-cat");
+    b.type = "button";
+    b.textContent = cat.label;
+    b.addEventListener("click", () => {
+      if (cat.id === curCat.id) return;
+      onSelect(cat.tracks[0], defaultRange(cat.id));
+    });
+    catsEl.appendChild(b);
+    catBtns.set(cat.id, b);
   }
 
   // Track tabs + range pills are rebuilt whenever the category changes.
-  const tabBtns = new Map<string, HTMLButtonElement>()
-  const pillBtns = new Map<GpuRange, HTMLButtonElement>()
-  let activeRange: GpuRange = defaultRange(curCat.id)
+  const tabBtns = new Map<string, HTMLButtonElement>();
+  const pillBtns = new Map<GpuRange, HTMLButtonElement>();
+  let activeRange: GpuRange = defaultRange(curCat.id);
 
   function renderCategory(cat: Category): void {
-    tabsEl.replaceChildren()
-    tabBtns.clear()
+    tabsEl.replaceChildren();
+    tabBtns.clear();
     for (const track of cat.tracks) {
-      const b = el('button', 'oh-tab')
-      b.type = 'button'
-      b.textContent = track.tab
-      b.addEventListener('click', () => {
-        const range = cat.ranges.includes(activeRange) ? activeRange : defaultRange(cat.id)
-        onSelect(track, range)
-      })
-      tabsEl.appendChild(b)
-      tabBtns.set(track.id, b)
+      const b = el("button", "oh-tab");
+      b.type = "button";
+      b.textContent = track.tab;
+      b.addEventListener("click", () => {
+        const range = cat.ranges.includes(activeRange) ? activeRange : defaultRange(cat.id);
+        onSelect(track, range);
+      });
+      tabsEl.appendChild(b);
+      tabBtns.set(track.id, b);
     }
 
-    rangesEl.replaceChildren()
-    pillBtns.clear()
+    rangesEl.replaceChildren();
+    pillBtns.clear();
     // Single-range categories (memory/tokens) hide the picker entirely.
-    rangesEl.classList.toggle('oh-hidden', cat.ranges.length <= 1)
+    rangesEl.classList.toggle("oh-hidden", cat.ranges.length <= 1);
     for (const r of cat.ranges) {
-      const b = el('button', 'oh-pill')
-      b.type = 'button'
-      b.textContent = RANGE_LABELS[r]
-      b.addEventListener('click', () => {
-        if (curTrack) onSelect(curTrack, r)
-      })
-      rangesEl.appendChild(b)
-      pillBtns.set(r, b)
+      const b = el("button", "oh-pill");
+      b.type = "button";
+      b.textContent = RANGE_LABELS[r];
+      b.addEventListener("click", () => {
+        if (curTrack) onSelect(curTrack, r);
+      });
+      rangesEl.appendChild(b);
+      pillBtns.set(r, b);
     }
   }
-  renderCategory(curCat)
+  renderCategory(curCat);
 
   function setActive(track: Track, range: GpuRange): void {
-    const cat = categoryOf(track.category)
+    const cat = categoryOf(track.category);
     if (cat.id !== curCat.id) {
-      curCat = cat
-      renderCategory(cat)
+      curCat = cat;
+      renderCategory(cat);
     }
-    curTrack = track
-    activeRange = range
-    for (const [id, b] of catBtns) b.classList.toggle('active', id === cat.id)
-    for (const [id, b] of tabBtns) b.classList.toggle('active', id === track.id)
-    for (const [id, b] of pillBtns) b.classList.toggle('active', id === range)
+    curTrack = track;
+    activeRange = range;
+    for (const [id, b] of catBtns) b.classList.toggle("active", id === cat.id);
+    for (const [id, b] of tabBtns) b.classList.toggle("active", id === track.id);
+    for (const [id, b] of pillBtns) b.classList.toggle("active", id === range);
   }
 
   function setPrice(price: number): void {
-    const unit = curCat.unit
-    const decimals = price < 10 ? 3 : 2
-    priceEl.innerHTML = `$${price.toFixed(decimals)}<span class="oh-hr">${unit}</span>`
+    const unit = curCat.unit;
+    const decimals = price < 10 ? 3 : 2;
+    priceEl.innerHTML = `$${price.toFixed(decimals)}<span class="oh-hr">${unit}</span>`;
   }
 
   function setHeader(price: number): void {
-    setPrice(price)
-    datetimeEl.textContent = ''
+    setPrice(price);
+    datetimeEl.textContent = "";
   }
 
   // ---- in-run stats ----
-  const stats = el('div', '')
-  stats.id = 'oh-stats'
+  const stats = el("div", "");
+  stats.id = "oh-stats";
   stats.innerHTML = `
     <div class="oh-stat"><span class="oh-k">Distance</span><span class="oh-v oh-mono" data-k="dist">0 m</span></div>
     <div class="oh-stat"><span class="oh-k">Points</span><span class="oh-v cred oh-mono" data-k="cred">0</span></div>
-    <div class="oh-stat"><span class="oh-k">Best</span><span class="oh-v oh-mono" data-k="best">—</span></div>`
-  const sDist = stats.querySelector<HTMLElement>('[data-k="dist"]')!
-  const sCred = stats.querySelector<HTMLElement>('[data-k="cred"]')!
-  const sBest = stats.querySelector<HTMLElement>('[data-k="best"]')!
+    <div class="oh-stat"><span class="oh-k">Best</span><span class="oh-v oh-mono" data-k="best">—</span></div>`;
+  const sDist = stats.querySelector<HTMLElement>('[data-k="dist"]')!;
+  const sCred = stats.querySelector<HTMLElement>('[data-k="cred"]')!;
+  const sBest = stats.querySelector<HTMLElement>('[data-k="best"]')!;
 
-  const speed = el('div', '')
-  speed.id = 'oh-speed'
-  speed.innerHTML = `<div class="oh-k">Speed</div><div class="oh-v oh-mono">0 <span>km/h</span></div>`
-  const sSpeed = speed.querySelector<HTMLElement>('.oh-v')!
-  const sSpeedText = sSpeed.firstChild as Text
+  const speed = el("div", "");
+  speed.id = "oh-speed";
+  speed.innerHTML = `<div class="oh-k">Speed</div><div class="oh-v oh-mono">0 <span>km/h</span></div>`;
+  const sSpeed = speed.querySelector<HTMLElement>(".oh-v")!;
+  const sSpeedText = sSpeed.firstChild as Text;
 
-  const hint = el('div', '')
-  hint.id = 'oh-hint'
-  hint.innerHTML = '<b>W</b> gas · <b>A</b> wheelie · <b>D</b> nose dive · <b>Shift</b> nitro'
+  const hint = el("div", "");
+  hint.id = "oh-hint";
+  hint.innerHTML = window.matchMedia("(pointer: coarse)").matches
+    ? "<b>&#9650;</b> gas · <b>&#9664;</b> wheelie · <b>&#9654;</b> nose dive · <b>A</b> nitro"
+    : "<b>W</b> gas · <b>A</b> wheelie · <b>D</b> nose dive · <b>Shift</b> nitro";
 
-  // Nitro meter (amber fill) + a touch boost button for coarse pointers.
-  const nitro = el('div', '')
-  nitro.id = 'oh-nitro'
-  nitro.innerHTML = `<div class="oh-k">Nitro</div><div class="oh-track"><div class="oh-fill"></div></div>`
-  const nitroFill = nitro.querySelector<HTMLElement>('.oh-fill')!
+  // Nitro meter (amber fill); armed state is mirrored onto the A button below.
+  const nitro = el("div", "");
+  nitro.id = "oh-nitro";
+  nitro.innerHTML = `<div class="oh-k">Nitro</div><div class="oh-track"><div class="oh-fill"></div></div>`;
+  const nitroFill = nitro.querySelector<HTMLElement>(".oh-fill")!;
 
-  const nitroBtn = el('button', '')
-  nitroBtn.id = 'oh-nitrobtn'
-  nitroBtn.type = 'button'
-  nitroBtn.textContent = 'NITRO'
-  const pressNitro = (on: boolean) => (e: Event) => { e.preventDefault(); onNitro?.(on) }
-  nitroBtn.addEventListener('pointerdown', pressNitro(true))
-  nitroBtn.addEventListener('pointerup', pressNitro(false))
-  nitroBtn.addEventListener('pointercancel', pressNitro(false))
-  nitroBtn.addEventListener('pointerleave', pressNitro(false))
+  // D-pad (touch): Up = gas, Left = wheelie (lean back), Right = nose dive
+  // (lean forward). Down is decorative — no action uses it.
+  const dpad = el("div", "");
+  dpad.id = "oh-dpad";
+  dpad.innerHTML = `
+    <button type="button" id="oh-dpad-up" class="oh-dpad-btn">&#9650;</button>
+    <button type="button" id="oh-dpad-left" class="oh-dpad-btn">&#9664;</button>
+    <button type="button" id="oh-dpad-right" class="oh-dpad-btn">&#9654;</button>
+    <button type="button" id="oh-dpad-down" class="oh-dpad-btn">&#9660;</button>`;
+  const dpadUp = dpad.querySelector<HTMLButtonElement>("#oh-dpad-up")!;
+  const dpadLeft = dpad.querySelector<HTMLButtonElement>("#oh-dpad-left")!;
+  const dpadRight = dpad.querySelector<HTMLButtonElement>("#oh-dpad-right")!;
 
-  hud.appendChild(stats)
-  hud.appendChild(speed)
-  hud.appendChild(nitro)
-  hud.appendChild(nitroBtn)
-  hud.appendChild(hint)
+  function wireDpadBtn(btn: HTMLButtonElement, onPress: (active: boolean) => void): void {
+    const set = (active: boolean) => (e: Event) => {
+      e.preventDefault();
+      btn.classList.toggle("pressed", active);
+      onPress(active);
+    };
+    btn.addEventListener("pointerdown", set(true));
+    btn.addEventListener("pointerup", set(false));
+    btn.addEventListener("pointercancel", set(false));
+    btn.addEventListener("pointerleave", set(false));
+  }
+  wireDpadBtn(dpadUp, onTouch.throttle);
+  wireDpadBtn(dpadLeft, onTouch.brake);
+  wireDpadBtn(dpadRight, onTouch.leanFwd);
+
+  // A button (touch): nitro.
+  const aBtn = el("button", "");
+  aBtn.id = "oh-abtn";
+  aBtn.type = "button";
+  aBtn.textContent = "A";
+  const pressA = (on: boolean) => (e: Event) => {
+    e.preventDefault();
+    onTouch.nitro(on);
+  };
+  aBtn.addEventListener("pointerdown", pressA(true));
+  aBtn.addEventListener("pointerup", pressA(false));
+  aBtn.addEventListener("pointercancel", pressA(false));
+  aBtn.addEventListener("pointerleave", pressA(false));
+
+  hud.appendChild(stats);
+  hud.appendChild(speed);
+  hud.appendChild(nitro);
+  hud.appendChild(dpad);
+  hud.appendChild(aBtn);
+  hud.appendChild(hint);
 
   // ---- results + loading ----
-  const results = el('div', 'oh-hidden')
-  results.id = 'oh-results'
-  const loading = el('div', 'oh-hidden')
-  loading.id = 'oh-loading'
-  loading.innerHTML = `<div class="oh-dot"></div><span></span>`
-  const loadingMsg = loading.querySelector<HTMLElement>('span')!
-  hud.appendChild(results)
-  hud.appendChild(loading)
+  const results = el("div", "oh-hidden");
+  results.id = "oh-results";
+  const loading = el("div", "oh-hidden");
+  loading.id = "oh-loading";
+  loading.innerHTML = `<div class="oh-dot"></div><span></span>`;
+  const loadingMsg = loading.querySelector<HTMLElement>("span")!;
+  hud.appendChild(results);
+  hud.appendChild(loading);
+
+  // ---- rotate-to-landscape prompt ----
+  const rotate = el("div", "");
+  rotate.id = "oh-rotate";
+  rotate.innerHTML = `<div class="oh-rotate-icon">&#8635;</div><div class="oh-rotate-text">Rotate your device to play</div>`;
+  hud.appendChild(rotate);
 
   // dirty-check caches
-  let lastDist = -1, lastCred = -1, lastBest = -1, lastSpeed = -1, hintHidden = false
-  let lastNitro = -1, lastArmed = false
-  let lastLivePrice = -1, lastLiveT = -1
+  let lastDist = -1,
+    lastCred = -1,
+    lastBest = -1,
+    lastSpeed = -1,
+    hintHidden = false;
+  let lastNitro = -1,
+    lastArmed = false;
+  let lastLivePrice = -1,
+    lastLiveT = -1;
 
   function update(state: GameState): void {
-    if (!state.terrain || !state.bike) return
+    if (!state.terrain || !state.bike) return;
     // Hide the ride hint once the run has begun.
-    if (state.started && !hintHidden) { hintHidden = true; hint.style.opacity = '0' }
-    if (!state.started && hintHidden) { hintHidden = false; hint.style.opacity = '1' }
+    if (state.started && !hintHidden) {
+      hintHidden = true;
+      hint.style.opacity = "0";
+    }
+    if (!state.started && hintHidden) {
+      hintHidden = false;
+      hint.style.opacity = "1";
+    }
 
     // Live ticker: header shows the price/date under the bike as you ride.
-    const lp = Math.round(state.livePrice * 1000)
+    const lp = Math.round(state.livePrice * 1000);
     if (lp !== lastLivePrice && state.livePrice > 0) {
-      lastLivePrice = lp
-      setPrice(state.livePrice)
+      lastLivePrice = lp;
+      setPrice(state.livePrice);
     }
     if (state.liveTimeMs !== lastLiveT) {
-      lastLiveT = state.liveTimeMs
+      lastLiveT = state.liveTimeMs;
       datetimeEl.textContent = state.liveTimeMs
         ? `${HDR_DATE_FMT.format(state.liveTimeMs)} · ${HDR_TIME_FMT.format(state.liveTimeMs)}`
-        : ''
+        : "";
     }
 
-    const dist = Math.round(state.distance / 10)
-    if (dist !== lastDist) { lastDist = dist; sDist.textContent = `${dist} m` }
-    if (state.points !== lastCred) { lastCred = state.points; sCred.textContent = String(state.points) }
-    const best = state.track ? (state.bestDistance[state.track.id] ?? 0) : 0
-    if (best !== lastBest) { lastBest = best; sBest.textContent = fmtBest(best) }
+    const dist = Math.round(state.distance / 10);
+    if (dist !== lastDist) {
+      lastDist = dist;
+      sDist.textContent = `${dist} m`;
+    }
+    if (state.points !== lastCred) {
+      lastCred = state.points;
+      sCred.textContent = String(state.points);
+    }
+    const best = state.track ? (state.bestDistance[state.track.id] ?? 0) : 0;
+    if (best !== lastBest) {
+      lastBest = best;
+      sBest.textContent = fmtBest(best);
+    }
     // Display calibration, not physics: raw is px/s; the literal 10px=1m scale
     // read ~500 km/h at top speed. 0.085 puts flat-out around ~115 km/h.
-    const spd = Math.round(state.bike.speed * 0.085)
-    if (spd !== lastSpeed) { lastSpeed = spd; sSpeedText.nodeValue = `${spd} ` }
+    const spd = Math.round(state.bike.speed * 0.085);
+    if (spd !== lastSpeed) {
+      lastSpeed = spd;
+      sSpeedText.nodeValue = `${spd} `;
+    }
 
     // Nitro meter fill; "armed" glow while boosting.
-    const np = Math.round(state.nitro * 100)
-    if (np !== lastNitro) { lastNitro = np; nitroFill.style.width = `${np}%` }
+    const np = Math.round(state.nitro * 100);
+    if (np !== lastNitro) {
+      lastNitro = np;
+      nitroFill.style.width = `${np}%`;
+    }
     if (state.nitroActive !== lastArmed) {
-      lastArmed = state.nitroActive
-      nitro.classList.toggle('armed', state.nitroActive)
-      nitroBtn.classList.toggle('armed', state.nitroActive)
+      lastArmed = state.nitroActive;
+      nitro.classList.toggle("armed", state.nitroActive);
+      aBtn.classList.toggle("armed", state.nitroActive);
     }
   }
 
   function showResults(state: GameState, onRetry: () => void): void {
-    const finished = state.phase === 'finished'
-    const distM = Math.round(state.distance / 10)
-    results.innerHTML = ''
-    const card = el('div', 'oh-rescard')
+    const finished = state.phase === "finished";
+    const distM = Math.round(state.distance / 10);
+    results.innerHTML = "";
+    const card = el("div", "oh-rescard");
     card.innerHTML = `
-      <div class="oh-restitle ${finished ? 'finished' : 'crashed'}">${finished ? 'FINISH' : 'CRASHED'}</div>
-      <div class="oh-newbest">${state.newBest ? '★ NEW BEST' : ''}</div>
+      <div class="oh-restitle ${finished ? "finished" : "crashed"}">${finished ? "FINISH" : "CRASHED"}</div>
+      <div class="oh-newbest">${state.newBest ? "★ NEW BEST" : ""}</div>
       <div class="oh-resgrid">
-        <div class="oh-rescell"><div class="oh-k">Distance</div><div class="oh-v oh-mono">${distM.toLocaleString('en-US')} m</div></div>
+        <div class="oh-rescell"><div class="oh-k">Distance</div><div class="oh-v oh-mono">${distM.toLocaleString("en-US")} m</div></div>
         <div class="oh-rescell"><div class="oh-k">Points</div><div class="oh-v oh-mono" style="color:${C.amber}">${state.points}</div></div>
         <div class="oh-rescell"><div class="oh-k">Flips</div><div class="oh-v oh-mono">${state.flips}</div></div>
         <div class="oh-rescell"><div class="oh-k">Air time</div><div class="oh-v oh-mono">${(state.airTimeMs / 1000).toFixed(1)}s</div></div>
       </div>
-      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Play Again'}</button></div>`
-    card.querySelector<HTMLButtonElement>('.oh-btn')!.addEventListener('click', onRetry)
-    results.appendChild(card)
-    results.classList.remove('oh-hidden')
+      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === "crashed" ? "Resume (R)" : "Play Again"}</button></div>`;
+    card.querySelector<HTMLButtonElement>(".oh-btn")!.addEventListener("click", onRetry);
+    results.appendChild(card);
+    results.classList.remove("oh-hidden");
   }
 
   function hideResults(): void {
-    results.classList.add('oh-hidden')
+    results.classList.add("oh-hidden");
   }
 
   function setLoading(msg: string | null): void {
     if (msg === null) {
-      loading.classList.add('oh-hidden')
+      loading.classList.add("oh-hidden");
     } else {
-      loadingMsg.textContent = msg
-      loading.classList.remove('oh-hidden')
+      loadingMsg.textContent = msg;
+      loading.classList.remove("oh-hidden");
     }
   }
 
-  return { update, setActive, setHeader, showResults, hideResults, setLoading }
+  return { update, setActive, setHeader, showResults, hideResults, setLoading };
 }
