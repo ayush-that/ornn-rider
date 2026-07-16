@@ -59,6 +59,12 @@ const SEG_THICKNESS = 50
 const SEG_OVERLAP = 8
 const COLLIDER_WINDOW = 2000
 
+// Left-edge containment: an invisible static wall whose right face sits at the
+// terrain start so reversing off the lead-in is impossible. Kill-plane below
+// the lowest terrain point catches any other freefall escape (physics glitch).
+const WALL_THICKNESS = 400
+const KILL_DROP = 600
+
 // --- Loop / spawn ----------------------------------------------------------
 const STEP = 1000 / 60
 const MAX_STEPS = 4
@@ -219,6 +225,11 @@ export class OrnnScene extends Phaser.Scene {
   private segXs: number[] = []
   private loIdx = 0
   private hiIdx = 0
+
+  // left-edge containment wall (always in the world, not windowed) + kill-plane
+  private leftWall: Body | null = null
+  private killY = Infinity
+  private killed = false
 
   // bike readonly-facing state
   private contacts = 0
@@ -403,6 +414,7 @@ export class OrnnScene extends Phaser.Scene {
     const sy = terrain.groundY(sx) - SPAWN_DY
 
     this.buildTerrainBodies(terrain, sx)
+    this.buildLeftWall(terrain)
     this.buildBike(sx, sy)
     this.buildCoins(terrain)
     this.buildFlag(terrain)
@@ -419,6 +431,9 @@ export class OrnnScene extends Phaser.Scene {
     this.segBodies = []
     this.segXs = []
     this.loIdx = this.hiIdx = 0
+    if (this.leftWall) { this.matter.world.remove(this.leftWall); this.leftWall = null }
+    this.killY = Infinity
+    this.killed = false
     // remove bike bodies + constraints
     if (this.bikeBodies.length) this.matter.world.remove(this.bikeBodies)
     this.bikeBodies = []
@@ -462,6 +477,23 @@ export class OrnnScene extends Phaser.Scene {
     }
     this.loIdx = this.hiIdx = 0
     this.updateCollider(startX)
+  }
+
+  // Invisible static wall pinned just left of the terrain start. It lives in the
+  // world for the whole run (not part of the sliding segment window), so the
+  // bike can never reverse past the lead-in into open space. Given a distinct
+  // 'wall' label so it doesn't register as grounded/head contact.
+  private buildLeftWall(terrain: Terrain): void {
+    const cx = terrain.startX - WALL_THICKNESS * 0.5
+    const cy = (terrain.minY + terrain.maxY) * 0.5
+    const height = (terrain.maxY - terrain.minY) + 4000 // tall enough to never clear
+    this.leftWall = this.matter.bodies.rectangle(cx, cy, WALL_THICKNESS, height, {
+      isStatic: true, label: 'wall', friction: 0, frictionStatic: 0, restitution: 0,
+    })
+    this.matter.world.add(this.leftWall)
+    // Kill-plane: any freefall this far below the lowest terrain point is a crash.
+    this.killY = terrain.maxY + KILL_DROP
+    this.killed = false
   }
 
   private updateCollider(bikeX: number): void {
@@ -572,6 +604,7 @@ export class OrnnScene extends Phaser.Scene {
     this.nitroLatch = false
     this.ejectCamUntil = 0
     this.crashed = false
+    this.killed = false
     this.headHit = false
     this.bikeView.ejected = false
     this.ragdollSprite.setVisible(false)
@@ -718,6 +751,12 @@ export class OrnnScene extends Phaser.Scene {
       this.collectCredits(bx, chassis.position.y)
       const d = bx - this.startX
       if (d > state.distance) state.distance = d
+      // Kill-plane safety net: any freefall past the terrain floor is a wipeout,
+      // even if the bike somehow escaped the left wall or a physics glitch.
+      if (!this.killed && chassis.position.y > this.killY) {
+        this.killed = true
+        this.crashed = true
+      }
       if (this.crashed) this.onCrash()
       else if (bx >= state.terrain!.endX) this.onFinish()
     }
