@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { SocialLayer } from "#/components/social-layer";
+import type { RunResult } from "#/lib/game/types";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -17,6 +20,7 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const uiRef = useRef<HTMLDivElement>(null);
+  const [lastRun, setLastRun] = useState<RunResult | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -33,7 +37,7 @@ function HomePage() {
     // Dynamic import keeps matter-js / window / canvas code off the server.
     import("#/lib/game/game").then((mod) => {
       if (cancelled || !canvasRef.current || !uiRef.current) return;
-      mod.startGame(canvasRef.current, uiRef.current);
+      mod.startGame(canvasRef.current, uiRef.current, { onRunEnd: setLastRun });
       stop = mod.stopGame;
     });
 
@@ -52,6 +56,9 @@ function HomePage() {
       {/* The game's own DOM header + HUD (branding, GPU tabs, price block,
           stats, results) mounts here. It owns all on-screen chrome. */}
       <div ref={uiRef} className="pointer-events-none fixed inset-0" />
+
+      {/* React layer: X sign-in, score submission, leaderboards (Convex). */}
+      <SocialLayer lastRun={lastRun} />
     </div>
   );
 }

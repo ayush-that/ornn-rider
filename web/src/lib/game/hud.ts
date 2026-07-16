@@ -3,7 +3,8 @@
 // results card. All CSS injected here.
 import type { GameState, Track, GpuRange } from './types'
 import { C } from './types'
-import { RANGES } from './data'
+import type { Category } from './data'
+import { RANGE_LABELS, categoryOf, defaultRange } from './data'
 
 const CSS = `
 #ornn-hud, #ornn-hud * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -23,9 +24,18 @@ const CSS = `
   box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
 }
 
-/* ---- header (no top navbar; tabs + price only) ---- */
+/* ---- header (no top navbar; category selector + tabs + price only) ---- */
 #oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 18px 24px 12px; }
-#oh-tabs { display: flex; gap: 8px; }
+#oh-cats { display: flex; gap: 8px; margin-bottom: 10px; }
+.oh-cat {
+  pointer-events: auto; cursor: pointer;
+  background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
+  font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+  color: ${C.dim}; padding: 5px 12px; transition: color .12s, border-color .12s;
+}
+.oh-cat:hover { color: #c8c8c8; }
+.oh-cat.active { color: ${C.text}; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
+#oh-tabs { display: flex; flex-wrap: wrap; gap: 8px; max-width: 720px; }
 .oh-tab {
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
@@ -152,7 +162,7 @@ function fmtBest(px: number): string {
 
 export function createHud(
   root: HTMLElement,
-  tracks: Track[],
+  categories: Category[],
   onSelect: (track: Track, range: GpuRange) => void,
   onNitro?: (active: boolean) => void,
 ) {
@@ -167,13 +177,14 @@ export function createHud(
   hud.id = 'ornn-hud'
   root.appendChild(hud)
 
-  let curTrackId = ''
-  let curRange: GpuRange = '3m'
+  let curTrack: Track | null = null
+  let curCat: Category = categories[0]
 
   // ---- header ----
   const header = el('div', '')
   header.id = 'oh-header'
   header.innerHTML = `
+    <div id="oh-cats"></div>
     <div id="oh-tabs"></div>
     <div id="oh-tabline"></div>
     <div id="oh-priceblock">
@@ -183,49 +194,81 @@ export function createHud(
     </div>`
   hud.appendChild(header)
 
+  const catsEl = header.querySelector<HTMLElement>('#oh-cats')!
   const tabsEl = header.querySelector<HTMLElement>('#oh-tabs')!
   const priceEl = header.querySelector<HTMLElement>('#oh-price')!
   const changeEl = header.querySelector<HTMLElement>('#oh-change')!
   const rangesEl = header.querySelector<HTMLElement>('#oh-ranges')!
 
+  // Category selector (COMPUTE / MEMORY / TOKENS). Picking one jumps to that
+  // category's first track at its default range.
+  const catBtns = new Map<string, HTMLButtonElement>()
+  for (const cat of categories) {
+    const b = el('button', 'oh-cat')
+    b.type = 'button'
+    b.textContent = cat.label
+    b.addEventListener('click', () => {
+      if (cat.id === curCat.id) return
+      onSelect(cat.tracks[0], defaultRange(cat.id))
+    })
+    catsEl.appendChild(b)
+    catBtns.set(cat.id, b)
+  }
+
+  // Track tabs + range pills are rebuilt whenever the category changes.
   const tabBtns = new Map<string, HTMLButtonElement>()
-  for (const track of tracks) {
-    const b = el('button', 'oh-tab')
-    b.type = 'button'
-    b.textContent = track.tab
-    b.addEventListener('click', () => {
-      const range: GpuRange = curRange === 'all' && !track.hasAll ? '3m' : curRange
-      onSelect(track, range)
-    })
-    tabsEl.appendChild(b)
-    tabBtns.set(track.id, b)
-  }
-
   const pillBtns = new Map<GpuRange, HTMLButtonElement>()
-  for (const r of RANGES) {
-    const b = el('button', 'oh-pill')
-    b.type = 'button'
-    b.textContent = r.label
-    b.addEventListener('click', () => {
-      const track = tracks.find(t => t.id === curTrackId)
-      if (track) onSelect(track, r.id)
-    })
-    rangesEl.appendChild(b)
-    pillBtns.set(r.id, b)
-  }
+  let activeRange: GpuRange = defaultRange(curCat.id)
 
-  function setActive(trackId: string, range: GpuRange, hasAll: boolean): void {
-    curTrackId = trackId
-    curRange = range
-    for (const [id, b] of tabBtns) b.classList.toggle('active', id === trackId)
-    for (const [id, b] of pillBtns) {
-      b.classList.toggle('active', id === range)
-      b.classList.toggle('oh-hidden', id === 'all' && !hasAll)
+  function renderCategory(cat: Category): void {
+    tabsEl.replaceChildren()
+    tabBtns.clear()
+    for (const track of cat.tracks) {
+      const b = el('button', 'oh-tab')
+      b.type = 'button'
+      b.textContent = track.tab
+      b.addEventListener('click', () => {
+        const range = cat.ranges.includes(activeRange) ? activeRange : defaultRange(cat.id)
+        onSelect(track, range)
+      })
+      tabsEl.appendChild(b)
+      tabBtns.set(track.id, b)
     }
+
+    rangesEl.replaceChildren()
+    pillBtns.clear()
+    // Single-range categories (memory/tokens) hide the picker entirely.
+    rangesEl.classList.toggle('oh-hidden', cat.ranges.length <= 1)
+    for (const r of cat.ranges) {
+      const b = el('button', 'oh-pill')
+      b.type = 'button'
+      b.textContent = RANGE_LABELS[r]
+      b.addEventListener('click', () => {
+        if (curTrack) onSelect(curTrack, r)
+      })
+      rangesEl.appendChild(b)
+      pillBtns.set(r, b)
+    }
+  }
+  renderCategory(curCat)
+
+  function setActive(track: Track, range: GpuRange): void {
+    const cat = categoryOf(track.category)
+    if (cat.id !== curCat.id) {
+      curCat = cat
+      renderCategory(cat)
+    }
+    curTrack = track
+    activeRange = range
+    for (const [id, b] of catBtns) b.classList.toggle('active', id === cat.id)
+    for (const [id, b] of tabBtns) b.classList.toggle('active', id === track.id)
+    for (const [id, b] of pillBtns) b.classList.toggle('active', id === range)
   }
 
   function setHeader(price: number, changePct: number): void {
-    priceEl.innerHTML = `$${price.toFixed(2)}<span class="oh-hr">/hr</span>`
+    const unit = curCat.unit
+    const decimals = price < 10 ? 3 : 2
+    priceEl.innerHTML = `$${price.toFixed(decimals)}<span class="oh-hr">${unit}</span>`
     const up = changePct >= 0
     changeEl.textContent = `${up ? '+' : ''}${changePct.toFixed(2)}%`
     changeEl.className = `${up ? 'up' : 'down'} oh-mono`

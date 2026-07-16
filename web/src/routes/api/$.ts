@@ -6,11 +6,17 @@ import { createFileRoute } from "@tanstack/react-router";
 // The game's data layer fetches relative /api/... paths (see lib/game/data.ts).
 const UPSTREAM = "https://api.ornnai.com";
 
-// Per-GPU history endpoints (/api/gpu/<name>/history-simple, /index-history)
-// require a bearer token. It is injected here, server-side only, and never
-// reaches the client. Public paths (e.g. /api/h100-history) work without it.
+// Market-data endpoints require a bearer token: per-GPU history
+// (/api/gpu/<name>/...), memory spot prices (/api/memory/...), token indices
+// (/api/otpi) and the keyed H100 history (/api/h100-history → full access). The
+// key is injected here, server-side only, and never reaches the client.
 function needsAuth(pathname: string): boolean {
-  return pathname.startsWith("/api/gpu/");
+  return (
+    pathname.startsWith("/api/gpu/") ||
+    pathname.startsWith("/api/memory/") ||
+    pathname.startsWith("/api/otpi") ||
+    pathname.startsWith("/api/h100-history")
+  );
 }
 
 export const Route = createFileRoute("/api/$")({

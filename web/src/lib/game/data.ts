@@ -1,32 +1,108 @@
-import type { Track, SeriesPoint, GpuRange } from './types'
+import type { Track, TrackCategory, SeriesPoint, GpuRange } from './types'
 
-// The six GPU tabs from the Ornn chart. `gpuName` is the API name used to build
-// history-simple / index-history paths; `tab` is the compact header label.
-export const TRACKS: Track[] = [
-  { id: 'h100', gpuName: 'H100 SXM', tab: 'H100', label: 'H100 SXM', hasAll: true },
-  { id: 'h200', gpuName: 'H200', tab: 'H200', label: 'H200', hasAll: false },
-  { id: 'b200', gpuName: 'B200', tab: 'B200', label: 'B200', hasAll: false },
-  { id: 'a100', gpuName: 'A100 SXM4', tab: 'A100', label: 'A100 SXM4', hasAll: false },
-  { id: 'rtx5090', gpuName: 'RTX 5090', tab: 'RTX 5090', label: 'RTX 5090', hasAll: false },
-  { id: 'rtxpro6000', gpuName: 'RTX PRO 6000 WS', tab: 'PRO 6000', label: 'RTX PRO 6000 WS', hasAll: false },
+// --- Track catalog ---------------------------------------------------------
+// Three families ride terrain built from real Ornn market data. compute = the
+// six GPU rental indices; memory = curated DRAM/NAND spot prices; tokens = LLM
+// output-token price indices per lab. `apiId` is the raw identifier used to
+// build the proxied API path; auth is injected server-side by /api (never here).
+
+// compute: the six GPU tabs from the Ornn chart. apiId = the API gpu name.
+export const COMPUTE_TRACKS: Track[] = [
+  { id: 'h100', category: 'compute', apiId: 'H100 SXM', tab: 'H100', label: 'H100 SXM' },
+  { id: 'h200', category: 'compute', apiId: 'H200', tab: 'H200', label: 'H200' },
+  { id: 'b200', category: 'compute', apiId: 'B200', tab: 'B200', label: 'B200' },
+  { id: 'a100', category: 'compute', apiId: 'A100 SXM4', tab: 'A100', label: 'A100 SXM4' },
+  { id: 'rtx5090', category: 'compute', apiId: 'RTX 5090', tab: 'RTX 5090', label: 'RTX 5090' },
+  { id: 'rtxpro6000', category: 'compute', apiId: 'RTX PRO 6000 WS', tab: 'PRO 6000', label: 'RTX PRO 6000 WS' },
 ]
 
-export const RANGES: { id: GpuRange; label: string }[] = [
-  { id: '1w', label: '1W' },
-  { id: '1m', label: '1M' },
-  { id: '3m', label: '3M' },
-  { id: 'all', label: 'ALL' }, // H100 only
+// memory: iconic tracks from the real /api/memory-types catalog. apiId = the
+// exact memory_type string (encodeURIComponent handles the embedded '/').
+export const MEMORY_TRACKS: Track[] = [
+  { id: 'mem-ddr5', category: 'memory', apiId: 'DDR5 16Gb (2Gx8) 4800/5600', tab: 'DDR5', label: 'DDR5 16Gb 4800/5600' },
+  { id: 'mem-ddr4', category: 'memory', apiId: 'DDR4 16Gb (2Gx8) 3200', tab: 'DDR4', label: 'DDR4 16Gb 3200' },
+  { id: 'mem-nand', category: 'memory', apiId: 'MLC 64Gb 8GBx8', tab: 'NAND', label: 'MLC 64Gb NAND Flash' },
+  { id: 'mem-rdimm', category: 'memory', apiId: 'DDR5 RDIMM 32GB 4800/5600', tab: 'RDIMM', label: 'DDR5 RDIMM 32GB' },
 ]
+
+// tokens: all eleven labs from /api/otpi. apiId = the lab slug.
+export const TOKEN_TRACKS: Track[] = [
+  { id: 'tok-anthropic', category: 'tokens', apiId: 'anthropic', tab: 'ANTHROPIC', label: 'Anthropic' },
+  { id: 'tok-openai', category: 'tokens', apiId: 'openai', tab: 'OPENAI', label: 'OpenAI' },
+  { id: 'tok-google', category: 'tokens', apiId: 'google', tab: 'GOOGLE', label: 'Google' },
+  { id: 'tok-deepseek', category: 'tokens', apiId: 'deepseek', tab: 'DEEPSEEK', label: 'DeepSeek' },
+  { id: 'tok-minimax', category: 'tokens', apiId: 'minimax', tab: 'MINIMAX', label: 'MiniMax' },
+  { id: 'tok-xiaomi', category: 'tokens', apiId: 'xiaomi', tab: 'XIAOMI', label: 'Xiaomi' },
+  { id: 'tok-qwen', category: 'tokens', apiId: 'qwen', tab: 'QWEN', label: 'Qwen' },
+  { id: 'tok-moonshot', category: 'tokens', apiId: 'moonshotai', tab: 'MOONSHOT', label: 'Moonshot AI' },
+  { id: 'tok-zai', category: 'tokens', apiId: 'z-ai', tab: 'Z.AI', label: 'Z.ai' },
+  { id: 'tok-mistral', category: 'tokens', apiId: 'mistralai', tab: 'MISTRAL', label: 'Mistral AI' },
+  { id: 'tok-meta', category: 'tokens', apiId: 'meta-llama', tab: 'META', label: 'Meta Llama' },
+]
+
+export interface Category {
+  id: TrackCategory
+  label: string // selector label
+  unit: string // price-line unit suffix
+  tracks: Track[]
+  ranges: GpuRange[] // applicable ranges (memory/tokens are daily-only)
+}
+
+export const CATEGORIES: Category[] = [
+  { id: 'compute', label: 'COMPUTE', unit: '/hr', tracks: COMPUTE_TRACKS, ranges: ['1w', '1m', '3m', 'all'] },
+  { id: 'memory', label: 'MEMORY', unit: '/unit', tracks: MEMORY_TRACKS, ranges: ['all'] },
+  { id: 'tokens', label: 'TOKENS', unit: '/Mtok', tracks: TOKEN_TRACKS, ranges: ['all'] },
+]
+
+// Flat lookup across every category (id → Track), for restore / lookups.
+export const TRACKS: Track[] = CATEGORIES.flatMap(c => c.tracks)
+
+export const RANGE_LABELS: Record<GpuRange, string> = {
+  '1w': '1W',
+  '1m': '1M',
+  '3m': '3M',
+  all: 'ALL',
+}
+
+export function categoryOf(cat: TrackCategory): Category {
+  return CATEGORIES.find(c => c.id === cat) ?? CATEGORIES[0]
+}
+
+// Default range for a category: 3m for compute, the sole range otherwise.
+export function defaultRange(cat: TrackCategory): GpuRange {
+  const ranges = categoryOf(cat).ranges
+  return ranges.includes('3m') ? '3m' : ranges[ranges.length - 1]
+}
+
+// Clamp a range to what the track's category actually supports.
+export function normalizeRange(track: Track, range: GpuRange): GpuRange {
+  const ranges = categoryOf(track.category).ranges
+  return ranges.includes(range) ? range : defaultRange(track.category)
+}
 
 const DAY_MS = 86_400_000
 
-// Build the proxied API path for a track+range. history-simple wants camelCase
-// startDate/endDate ISO params; index-history and h100-history take none.
-// Auth is injected server-side by the /api proxy — never here.
+// Build the proxied API path for a track+range. Auth is injected server-side by
+// the /api proxy — never here. Each category has its own endpoint + response
+// shape (parsed in extractSeries).
 function endpointFor(track: Track, range: GpuRange): string {
-  const enc = encodeURIComponent(track.gpuName)
   const now = Date.now()
   const iso = (ms: number) => new Date(ms).toISOString()
+
+  if (track.category === 'memory') {
+    // Daily spot-price history; limit=3000 pulls the full backfill (NAND flash
+    // reaches back to 2008, capped at 1000 without it).
+    return `/api/memory/${encodeURIComponent(track.apiId)}/history?limit=3000`
+  }
+
+  if (track.category === 'tokens') {
+    // Daily output-token price index per lab, oldest-first.
+    const today = iso(now).slice(0, 10)
+    return `/api/otpi?lab=${encodeURIComponent(track.apiId)}&startDate=2024-01-01&endDate=${today}`
+  }
+
+  // compute
+  const enc = encodeURIComponent(track.apiId)
   if (range === '1w' || range === '1m') {
     const days = range === '1w' ? 7 : 30
     const limit = range === '1w' ? 300 : 800
@@ -34,21 +110,50 @@ function endpointFor(track: Track, range: GpuRange): string {
     const end = iso(now)
     return `/api/gpu/${enc}/history-simple?granularity=hourly&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=${limit}`
   }
-  if (range === 'all' && track.hasAll) {
-    return `/api/h100-history`
+  if (range === 'all') {
+    // Full daily history for every GPU (H200 → ~540 points, H100 → ~750).
+    const start = '2023-01-01T00:00:00Z'
+    const end = iso(now)
+    return `/api/gpu/${enc}/history-simple?granularity=daily&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=3000`
   }
-  // 3m (and the fallback for a non-H100 'all') = daily index history.
+  // 3m = daily index history.
   return `/api/gpu/${enc}/index-history`
 }
 
-// One cache entry per track+range; overwritten on each successful fetch so
-// storage stays bounded and yesterday's data survives as a stale fallback.
-function getCacheKey(trackId: string, range: GpuRange): string {
-  return `ornn-rider:${trackId}:${range}`
+// Normalize a category's response rows to {t, v}. compute serves
+// {timestamp, index_value}; memory {date, price}; tokens {date, indexPerMtok}.
+function extractSeries(track: Track, json: unknown): SeriesPoint[] {
+  const data = (json as { data?: unknown }).data
+  if (!Array.isArray(data)) throw new Error('Invalid response format')
+
+  const rows = data as Array<Record<string, unknown>>
+  const toMs = (d: unknown): number =>
+    typeof d === 'number' ? d : new Date(String(d)).getTime()
+
+  let mapped: SeriesPoint[]
+  if (track.category === 'memory') {
+    mapped = rows.map(r => ({ t: toMs(r.date), v: Number(r.price) }))
+  } else if (track.category === 'tokens') {
+    mapped = rows.map(r => ({ t: toMs(r.date), v: Number(r.indexPerMtok) }))
+  } else {
+    mapped = rows.map(r => ({ t: toMs(r.timestamp), v: Number(r.index_value) }))
+  }
+
+  // Sort oldest-first defensively (history-simple / memory serve most-recent
+  // first; index-history / otpi serve oldest-first) so terrain builds L→R.
+  return mapped
+    .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v))
+    .sort((a, b) => a.t - b.t)
+}
+
+// One cache entry per category+track+range; overwritten on each successful fetch
+// so storage stays bounded and yesterday's data survives as a stale fallback.
+function getCacheKey(track: Track, range: GpuRange): string {
+  return `ornn-rider:${track.category}:${track.id}:${range}`
 }
 
 // Remove entries written by an earlier version that stamped the key with the
-// date, or that predate the range suffix (`ornn-rider:<id>` with no range).
+// date, or that predate the range/category suffix.
 function cleanupLegacyCacheKeys(): void {
   try {
     const legacyDate = /^ornn-rider:.+:\d{4}-\d{2}-\d{2}$/
@@ -65,9 +170,9 @@ function cleanupLegacyCacheKeys(): void {
 }
 cleanupLegacyCacheKeys()
 
-function getCacheValue(trackId: string, range: GpuRange, allowStale: boolean): SeriesPoint[] | null {
+function getCacheValue(track: Track, range: GpuRange, allowStale: boolean): SeriesPoint[] | null {
   try {
-    const item = localStorage.getItem(getCacheKey(trackId, range))
+    const item = localStorage.getItem(getCacheKey(track, range))
     if (!item) return null
     const parsed = JSON.parse(item)
     if (!parsed.data || !Array.isArray(parsed.data) || parsed.data.length < 2) return null
@@ -85,41 +190,29 @@ function getCacheValue(trackId: string, range: GpuRange, allowStale: boolean): S
   }
 }
 
-function setCacheValue(trackId: string, range: GpuRange, data: SeriesPoint[]): void {
+function setCacheValue(track: Track, range: GpuRange, data: SeriesPoint[]): void {
   try {
-    localStorage.setItem(getCacheKey(trackId, range), JSON.stringify({ data, timestamp: Date.now() }))
+    localStorage.setItem(getCacheKey(track, range), JSON.stringify({ data, timestamp: Date.now() }))
   } catch {
     // localStorage full or disabled, silently fail
   }
 }
 
 export async function fetchSeries(track: Track, range: GpuRange): Promise<SeriesPoint[]> {
-  const cached = getCacheValue(track.id, range, false)
+  const cached = getCacheValue(track, range, false)
   if (cached) return cached
 
   try {
     const response = await fetch(endpointFor(track, range))
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-    const json = (await response.json()) as { success?: boolean; data?: Array<{ timestamp: number | string; index_value: number | string }> }
-    if (!json.data || !Array.isArray(json.data)) throw new Error('Invalid response format')
-
-    // history-simple serves most-recent-first; index-history oldest-first.
-    // Sort oldest-first defensively so terrain always builds left-to-right.
-    const series: SeriesPoint[] = json.data
-      .map(point => ({
-        t: typeof point.timestamp === 'number' ? point.timestamp : new Date(point.timestamp).getTime(),
-        v: Number(point.index_value),
-      }))
-      .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v))
-      .sort((a, b) => a.t - b.t)
-
+    const series = extractSeries(track, await response.json())
     if (series.length < 2) throw new Error('Series too short')
 
-    setCacheValue(track.id, range, series)
+    setCacheValue(track, range, series)
     return series
   } catch (error) {
-    const staleCache = getCacheValue(track.id, range, true)
+    const staleCache = getCacheValue(track, range, true)
     if (staleCache) return staleCache
     throw new Error(`Failed to fetch series for ${track.id}/${range}: ${error instanceof Error ? error.message : String(error)}`)
   }
