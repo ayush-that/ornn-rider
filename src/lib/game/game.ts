@@ -4,6 +4,7 @@
 // route dynamically imports this module inside a useEffect (see index.tsx).
 import * as Phaser from 'phaser'
 import type { GameState, Track, GpuRange, RunResult } from './types'
+import { DPR } from './types'
 import { TRACKS, CATEGORIES, fetchSeries, normalizeRange } from './data'
 import { buildTerrain } from './terrain'
 import { createHud } from './hud'
@@ -177,14 +178,22 @@ export function startGame(
 
   const scene = new OrnnScene(ctx)
 
+  const applyCanvasSize = (): void => {
+    canvas.style.width = '100%'
+    canvas.style.height = '100%'
+  }
+
   const game = new Phaser.Game({
     type: Phaser.WEBGL,
     canvas,
     backgroundColor: '#050505',
+    // Physical-resolution canvas (CSS stretches it back down): without this the
+    // backing store is CSS-sized and the browser upscales the frame — soft
+    // everywhere, obvious at speed. Scale.NONE + our own resize keeps control.
     scale: {
-      mode: Phaser.Scale.RESIZE,
-      width: window.innerWidth,
-      height: window.innerHeight,
+      mode: Phaser.Scale.NONE,
+      width: Math.round(window.innerWidth * DPR),
+      height: Math.round(window.innerHeight * DPR),
     },
     fps: { target: 60, min: 30 },
     // We drive Matter with a fixed-step accumulator inside the scene, so disable
@@ -201,6 +210,7 @@ export function startGame(
     render: { pixelArt: true, powerPreference: 'high-performance' },
     scene,
   })
+  applyCanvasSize()
 
   let loadSeq = 0
   async function loadTrack(track: Track, range: GpuRange): Promise<void> {
@@ -248,6 +258,10 @@ export function startGame(
     if (PREVENT.has(e.code)) e.preventDefault()
   }, listen)
   window.addEventListener('keyup', (e) => keys.delete(e.code), listen)
+  window.addEventListener('resize', () => {
+    game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR))
+    applyCanvasSize()
+  }, listen)
   // Background music starts on the first gesture (AudioContext unlock) and
   // follows the mute toggle from then on.
   const startMusic = (): void => {

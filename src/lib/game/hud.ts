@@ -27,7 +27,11 @@ const CSS = `
   box-shadow: 4px 4px 0 rgba(0,0,0,0.65);
 }
 
-/* ---- header (no top navbar; category selector + tabs + price only) ---- */
+/* ---- header ---- */
+/* Track selection moved to the start screen; the in-game selector is hidden
+   (the plumbing stays so setActive/deep-links keep working). */
+#oh-cats, #oh-tabs { display: none !important; }
+
 #oh-header { position: absolute; top: 0; left: 0; right: 0; padding: 26px 28px 12px; }
 #oh-cats { display: flex; gap: 8px; margin-bottom: 16px; }
 .oh-cat {
@@ -125,7 +129,7 @@ const CSS = `
 .oh-rescell .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; line-height: 1.3; }
 .oh-rescell .oh-v { font-size: 18px; font-weight: 600; margin-top: 5px; line-height: 1.25; }
 .oh-newbest { font-size: 11px; color: ${C.amber}; letter-spacing: 0.12em; margin-bottom: 14px; min-height: 15px; line-height: 1.3; }
-.oh-btnrow { display: flex; gap: 10px; }
+.oh-btnrow { display: flex; gap: 10px; margin-top: 14px; }
 .oh-btn {
   flex: 1; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 1.3;
   padding: 11px 0; border-radius: 0; cursor: pointer; border: 2px solid transparent; transition: filter .12s;
@@ -414,7 +418,7 @@ export function createHud(
         <div class="oh-rescell"><div class="oh-k">Flips</div><div class="oh-v oh-mono">${state.flips}</div></div>
         <div class="oh-rescell"><div class="oh-k">Air time</div><div class="oh-v oh-mono">${(state.airTimeMs / 1000).toFixed(1)}s</div></div>
       </div>
-      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Retry (R)'}</button></div>`
+      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Play Again'}</button></div>`
     card.querySelector<HTMLButtonElement>('.oh-btn')!.addEventListener('click', onRetry)
     results.appendChild(card)
     results.classList.remove('oh-hidden')

@@ -2,6 +2,10 @@
 // (scene.ts); this file stays framework-agnostic so data.ts / terrain.ts /
 // hud.ts keep compiling without importing Phaser or matter-js.
 
+// Device pixel ratio (capped at 2): the canvas renders at physical resolution
+// so the game isn't browser-upscaled into softness. 1 during SSR.
+export const DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1
+
 export interface SeriesPoint {
   t: number // unix ms
   v: number // price in the track's unit ($/hr, $/unit or $/Mtok — see PRICE_UNIT)
