@@ -3,8 +3,8 @@
 // live in OrnnScene (scene.ts). Phaser must never be imported server-side; the
 // route dynamically imports this module inside a useEffect (see index.tsx).
 import * as Phaser from 'phaser'
-import type { GameState, Track, GpuRange, SeriesPoint } from './types'
-import { TRACKS, fetchSeries } from './data'
+import type { GameState, Track, GpuRange, SeriesPoint, RunResult } from './types'
+import { TRACKS, CATEGORIES, fetchSeries, normalizeRange } from './data'
 import { buildTerrain } from './terrain'
 import { createHud } from './hud'
 import { createAudio } from './audio'
@@ -37,8 +37,7 @@ function loadLast(): { track: Track; range: GpuRange } {
     /* ignore */
   }
   const track = TRACKS.find(t => t.id === trackId) ?? TRACKS[0]
-  if (range === 'all' && !track.hasAll) range = '3m'
-  return { track, range }
+  return { track, range: normalizeRange(track, range) }
 }
 
 function saveLast(trackId: string, range: GpuRange): void {
@@ -80,7 +79,11 @@ export function stopGame(): void {
   }
 }
 
-export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
+export function startGame(
+  canvas: HTMLCanvasElement,
+  root: HTMLElement,
+  opts?: { onRunEnd?: (run: RunResult) => void },
+): void {
   if (activeStop) stopGame()
   const ac = new AbortController()
   const listen: AddEventListenerOptions = { signal: ac.signal }
@@ -93,7 +96,7 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
 
   const hud = createHud(
     root,
-    TRACKS,
+    CATEGORIES,
     (t: Track, r: GpuRange) => void loadTrack(t, r),
     (active: boolean) => { touch.nitro = active },
   )
@@ -133,6 +136,8 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
     get bike() { return state.bike },
   }
 
+  const SCORE_PREFIX = { compute: 'gpu', memory: 'mem', tokens: 'tok' } as const
+
   function saveBest(): void {
     const t = state.track
     if (!t) return
@@ -146,6 +151,16 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
         /* ignore */
       }
     }
+    // saveBest fires exactly once per run (crash or finish) — the leaderboard hook.
+    opts?.onRunEnd?.({
+      trackId: `${SCORE_PREFIX[t.category]}:${t.apiId}`,
+      category: t.category,
+      range: state.range,
+      distance: Math.round(state.distance / 10),
+      coins: state.credits,
+      flips: state.flips,
+      finished: state.phase === 'finished',
+    })
   }
 
   const ctx: GameCtx = {
@@ -192,11 +207,11 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
   let loadSeq = 0
   async function loadTrack(track: Track, range: GpuRange): Promise<void> {
     const seq = ++loadSeq
-    if (range === 'all' && !track.hasAll) range = '3m'
+    range = normalizeRange(track, range)
     state.phase = 'loading'
     state.range = range
     hud.hideResults()
-    hud.setActive(track.id, range, track.hasAll)
+    hud.setActive(track, range)
     hud.setLoading('loading ' + track.label + ' ' + range.toUpperCase() + ' …')
     try {
       const series = await fetchSeries(track, range)
@@ -208,7 +223,7 @@ export function startGame(canvas: HTMLCanvasElement, root: HTMLElement): void {
       state.latestPrice = series[series.length - 1]!.v
       state.latestChangePct = computeDayChange(series)
       hud.setHeader(state.latestPrice, state.latestChangePct)
-      hud.setActive(track.id, range, track.hasAll)
+      hud.setActive(track, range)
       hud.setLoading(null)
       saveLast(track.id, range)
       scene.buildWorld(terrain) // sets phase = 'playing', resets the run

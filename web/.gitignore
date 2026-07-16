@@ -22,3 +22,4 @@ dist
 /public/build
 
 .tanstack
+.env.local

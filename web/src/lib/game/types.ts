@@ -4,19 +4,42 @@
 
 export interface SeriesPoint {
   t: number // unix ms
-  v: number // index value, USD per GPU-hour
+  v: number // price in the track's unit ($/hr, $/unit or $/Mtok — see PRICE_UNIT)
 }
 
-// Track length variant. 1w/1m = hourly history-simple, 3m = daily index-history,
-// all = H100-only full public history.
+// The three track families. compute = GPU rental ($/hr), memory = DRAM/NAND spot
+// price ($/unit), tokens = LLM output-token price index ($/Mtok).
+export type TrackCategory = 'compute' | 'memory' | 'tokens'
+
+// Track length variant. compute uses all four (1w/1m hourly, 3m daily index,
+// all = full daily history-simple); memory/tokens are daily-only → 'all' only.
 export type GpuRange = '1w' | '1m' | '3m' | 'all'
 
 export interface Track {
-  id: string // e.g. 'h100'
-  gpuName: string // API name, e.g. 'H100 SXM'
+  id: string // globally unique, e.g. 'h100', 'mem-ddr5', 'tok-anthropic'
+  category: TrackCategory
+  apiId: string // API identifier: gpu name / memory type / lab slug
   tab: string // header tab label, e.g. 'H100'
   label: string // long display name, e.g. 'H100 SXM'
-  hasAll: boolean // exposes the extra ALL range (full public history)
+}
+
+// Emitted once when a run ends (crash or finish); the React layer posts it to
+// the Convex leaderboard. distance is in meters (px / 10, what the HUD shows).
+export interface RunResult {
+  trackId: string // scores-table id, e.g. "gpu:H100 SXM" | "mem:DDR5 ..." | "tok:anthropic"
+  category: TrackCategory
+  range: GpuRange
+  distance: number
+  coins: number
+  flips: number
+  finished: boolean
+}
+
+// Price-line unit suffix per category, shown in the header / tooltip.
+export const PRICE_UNIT: Record<TrackCategory, string> = {
+  compute: '/hr',
+  memory: '/unit',
+  tokens: '/Mtok',
 }
 
 export interface TerrainPoint {

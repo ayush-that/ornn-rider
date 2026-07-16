@@ -1,34 +1,16 @@
-import { a11yDevtoolsPlugin } from "@tanstack/devtools-a11y/react";
-import { TanStackDevtools } from "@tanstack/react-devtools";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import type { QueryClient } from "@tanstack/react-query";
-import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
-import { ThemeProvider } from "#/components/theme-provider";
-import { Toaster } from "#/components/ui/sonner";
-import type { AuthQueryResult } from "#/lib/auth/queries";
+import { convex } from "#/lib/convex";
 
 import appCss from "#/styles.css?url";
 
-// react-grab: hover any element + Cmd+C to copy its component source context
-// for coding agents. Dev-only, browser-only (never loads on the server or in
-// production bundles).
-if (typeof document !== "undefined" && import.meta.env.DEV) {
-  void import("react-grab");
-}
-
 interface MyRouterContext {
   queryClient: QueryClient;
-  user: AuthQueryResult;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  // Typically we don't need the user immediately in landing pages.
-  // For protected routes with loader data, see /_auth/route.tsx
-  // beforeLoad: ({ context }) => {
-  //   context.queryClient.prefetchQuery(authQueryOptions());
-  // },
   head: () => ({
     meta: [
       {
@@ -39,21 +21,15 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        // scaffold:title
-        title: "TanStarter",
+        title: "Ornn Rider",
       },
       {
         name: "description",
-        // scaffold:description
-        content: "A minimal starter template for 🏝️ TanStack Start.",
+        content: "Ride the compute market — a bike over real GPU, memory, and token price charts.",
       },
     ],
     links: [
-      // Replace with your icons here, or remove if you have a favicon.ico in public/
-      {
-        rel: "icon",
-        href: "https://mugnavo.com/favicon.ico",
-      },
+      { rel: "icon", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
     ],
   }),
@@ -62,31 +38,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { readonly children: React.ReactNode }) {
   return (
-    // suppress since we're updating the "dark" class in ThemeProvider
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <ThemeProvider>
-          {children}
-          <Toaster richColors />
-        </ThemeProvider>
-
-        <TanStackDevtools
-          plugins={[
-            {
-              name: "TanStack Query",
-              render: <ReactQueryDevtoolsPanel />,
-            },
-            {
-              name: "TanStack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            a11yDevtoolsPlugin(),
-          ]}
-        />
-
+        <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>
         <Scripts />
       </body>
     </html>
