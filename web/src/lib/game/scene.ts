@@ -53,7 +53,7 @@ const WHEELIE_TORQUE = 0.018 // raised for the wider 112 wheelbase (was 0.007 at
 const MAX_WHEELIE_AV = 0.11
 // Arcade lean: one constant authority at every angle, grounded or not, so the
 // bike can always be righted from a nose-stand (user call: no realistic physics).
-const LEAN = 0.022
+const LEAN = 0.034
 // Past this tilt (|angle| from upright, rad) left/right double as lean even on
 // the ground — driving inputs are useless in that orientation anyway.
 const TIPPED_ANGLE = 1.75
