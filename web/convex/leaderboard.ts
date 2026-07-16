@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
@@ -42,43 +43,34 @@ export const submitRun = mutation({
   },
 });
 
+// Cursor-paginated, score-descending. Per-user dedup happens client-side over
+// the accumulated pages (dedup can't cross a server cursor boundary), so each
+// row carries a stable `key` for it.
 export const topRuns = query({
   args: {
     category: CATEGORY,
     trackId: v.optional(v.string()),
-    limit: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
-  handler: async (ctx, { category, trackId, limit }) => {
-    const n = Math.min(limit ?? 25, 100);
-    // Over-fetch, then keep each user's best run so one player can't fill the board.
-    const rows =
+  handler: async (ctx, { category, trackId, paginationOpts }) => {
+    const result =
       trackId !== undefined
         ? await ctx.db
             .query("scores")
             .withIndex("by_track_score", (q) => q.eq("trackId", trackId))
             .order("desc")
-            .take(n * 10)
+            .paginate(paginationOpts)
         : await ctx.db
             .query("scores")
             .withIndex("by_category_score", (q) => q.eq("category", category))
             .order("desc")
-            .take(n * 10);
+            .paginate(paginationOpts);
 
-    const seen = new Set<string>();
-    const top: typeof rows = [];
-    for (const row of rows) {
-      const key = row.userId ?? row._id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      top.push(row);
-      if (top.length >= n) break;
-    }
-
-    return Promise.all(
-      top.map(async (row, i) => {
+    const page = await Promise.all(
+      result.page.map(async (row) => {
         const user = row.userId ? await ctx.db.get(row.userId) : null;
         return {
-          rank: i + 1,
+          key: row.userId ?? row._id,
           name: user?.name ?? row.anonName ?? "anon",
           username: user?.username ?? null,
           image: user?.image ?? null,
@@ -91,6 +83,7 @@ export const topRuns = query({
         };
       }),
     );
+    return { ...result, page };
   },
 });
 

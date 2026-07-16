@@ -367,7 +367,9 @@ export function createHud(
     if (state.credits !== lastCred) { lastCred = state.credits; sCred.textContent = String(state.credits) }
     const best = state.track ? (state.bestDistance[state.track.id] ?? 0) : 0
     if (best !== lastBest) { lastBest = best; sBest.textContent = fmtBest(best) }
-    const spd = Math.round(state.bike.speed * 0.36)
+    // Display calibration, not physics: raw is px/s; the literal 10px=1m scale
+    // read ~500 km/h at top speed. 0.085 puts flat-out around ~115 km/h.
+    const spd = Math.round(state.bike.speed * 0.085)
     if (spd !== lastSpeed) { lastSpeed = spd; sSpeedText.nodeValue = `${spd} ` }
 
     // Nitro meter fill; "armed" glow while boosting.

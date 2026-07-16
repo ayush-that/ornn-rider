@@ -1,6 +1,6 @@
 import { SiX } from "@icons-pack/react-simple-icons";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 
 import type { RunResult, TrackCategory } from "#/lib/game/types";
@@ -176,11 +176,23 @@ function Leaderboard({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const rows = useQuery(api.leaderboard.topRuns, {
-    category,
-    trackId: trackId ?? undefined,
-    limit: 25,
+  const {
+    results,
+    status,
+    loadMore,
+  } = usePaginatedQuery(
+    api.leaderboard.topRuns,
+    { category, trackId: trackId ?? undefined },
+    { initialNumItems: 25 },
+  );
+  // Keep only each rider's best (first, since pages arrive score-descending).
+  const seen = new Set<string>();
+  const rows = results.filter((r) => {
+    if (seen.has(r.key)) return false;
+    seen.add(r.key);
+    return true;
   });
+  const loading = status === "LoadingFirstPage";
 
   const prefix = { compute: "gpu", memory: "mem", tokens: "tok" }[category];
   const tracks = TRACKS.filter((t) => t.category === category);
@@ -241,7 +253,7 @@ function Leaderboard({
         </div>
 
         <div className="min-h-40 overflow-y-auto">
-          {rows === undefined ? (
+          {loading ? (
             <div className="py-8 text-center text-[12px] text-[#909090]">loading…</div>
           ) : rows.length === 0 ? (
             <div className="py-8 text-center text-[12px] text-[#909090]">
@@ -261,10 +273,10 @@ function Leaderboard({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={`${r.rank}`} className="border-t-2 border-[#1a1a1a] text-[#c8c8c8]">
-                    <td className={`py-2 pr-2 ${r.rank === 1 ? "text-[#f5a524]" : "text-[#909090]"}`}>
-                      {r.rank}
+                {rows.map((r, i) => (
+                  <tr key={r.key} className="border-t-2 border-[#1a1a1a] text-[#c8c8c8]">
+                    <td className={`py-2 pr-2 ${i === 0 ? "text-[#f5a524]" : "text-[#909090]"}`}>
+                      {i + 1}
                     </td>
                     <td className="py-2 pr-2">
                       <span className="flex items-center gap-2">
@@ -290,6 +302,17 @@ function Leaderboard({
               </tbody>
             </table>
           )}
+          {status === "CanLoadMore" ? (
+            <button
+              type="button"
+              className={`${btn} mt-3 w-full py-2 text-center`}
+              onClick={() => loadMore(25)}
+            >
+              LOAD MORE
+            </button>
+          ) : status === "LoadingMore" ? (
+            <div className="py-3 text-center text-[11px] text-[#909090]">loading…</div>
+          ) : null}
         </div>
       </div>
     </div>
