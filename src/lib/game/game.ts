@@ -85,7 +85,7 @@ export function startGame(
 
   // --- input state (shared with the scene) ---
   const keys = new Set<string>()
-  const touch = { throttle: false, brake: false, nitro: false }
+  const touch = { throttle: false, brake: false, nitro: false, leanFwd: false }
   let muted = false
   const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'])
 
@@ -255,19 +255,40 @@ export function startGame(
   }
   window.addEventListener('keydown', startMusic, { once: true, signal: ac.signal })
   window.addEventListener('pointerdown', startMusic, { once: true, signal: ac.signal })
-  const clearInput = (): void => { keys.clear(); touch.throttle = false; touch.brake = false; touch.nitro = false }
+  const clearInput = (): void => { keys.clear(); activePointers.clear(); touch.throttle = false; touch.brake = false; touch.nitro = false; touch.leanFwd = false }
   window.addEventListener('blur', clearInput, listen)
 
   // --- touch halves on the canvas (left = brake, right = throttle) ---
+  // Touch zones (multi-touch: each pointer is tracked so gas + a trick can be
+  // held together): right half = gas · top-left quadrant = wheelie (like A) ·
+  // bottom-left quadrant = nose dive (like D).
+  const activePointers = new Map<number, 'gas' | 'back' | 'fwd'>()
+  const applyPointers = (): void => {
+    let gas = false, back = false, fwd = false
+    for (const zone of activePointers.values()) {
+      if (zone === 'gas') gas = true
+      else if (zone === 'back') back = true
+      else fwd = true
+    }
+    touch.throttle = gas
+    touch.brake = back
+    touch.leanFwd = fwd
+  }
   canvas.addEventListener('pointerdown', (e) => {
     if (state.phase !== 'playing') return
-    if (e.clientX < window.innerWidth / 2) touch.brake = true
-    else touch.throttle = true
+    const zone = e.clientX >= window.innerWidth / 2
+      ? 'gas'
+      : e.clientY < window.innerHeight / 2 ? 'back' : 'fwd'
+    activePointers.set(e.pointerId, zone)
+    applyPointers()
   }, listen)
-  const clearTouch = (): void => { touch.throttle = false; touch.brake = false }
-  canvas.addEventListener('pointerup', clearTouch, listen)
-  canvas.addEventListener('pointercancel', clearTouch, listen)
-  canvas.addEventListener('pointerleave', clearTouch, listen)
+  const releasePointer = (e: PointerEvent): void => {
+    activePointers.delete(e.pointerId)
+    applyPointers()
+  }
+  canvas.addEventListener('pointerup', releasePointer, listen)
+  canvas.addEventListener('pointercancel', releasePointer, listen)
+  canvas.addEventListener('pointerleave', releasePointer, listen)
 
   activeStop = () => {
     ac.abort()

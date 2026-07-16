@@ -146,7 +146,7 @@ export interface GameCtx {
   hud: Hud
   audio: Audio
   keys: Set<string>
-  touch: { throttle: boolean; brake: boolean; nitro: boolean }
+  touch: { throttle: boolean; brake: boolean; nitro: boolean; leanFwd: boolean }
   isMuted: () => boolean
   saveBest: () => void // persist best distance + set state.newBest
   onReady: () => void // fired once the scene has booted (kick off first load)
@@ -235,6 +235,7 @@ export class OrnnScene extends Phaser.Scene {
 
   // graphics / text layers
   private worldGfx!: Phaser.GameObjects.Graphics
+  private starGfx!: Phaser.GameObjects.Graphics
   private chromeGfx!: Phaser.GameObjects.Graphics
   private axisTexts: Phaser.GameObjects.Text[] = []
   private dateTexts: Phaser.GameObjects.Text[] = []
@@ -359,6 +360,7 @@ export class OrnnScene extends Phaser.Scene {
     this.makeParticleTextures()
 
     // Layers (world space is transformed by the camera; chrome is pinned).
+    this.starGfx = this.add.graphics().setScrollFactor(0).setDepth(-1)
     this.worldGfx = this.add.graphics().setDepth(0)
 
     // Bike sprites — created hidden, positioned once the world is built.
@@ -859,7 +861,7 @@ export class OrnnScene extends Phaser.Scene {
       // (lean back) · D/→ = nose dive (lean forward) · S/↓ = nothing.
       const fwd = this.down('KeyW') || this.down('ArrowUp') || this.down('Space') || this.ctx.touch.throttle
       const leanBack = this.down('KeyA') || this.down('ArrowLeft') || this.ctx.touch.brake
-      const leanFwd = this.down('KeyD') || this.down('ArrowRight')
+      const leanFwd = this.down('KeyD') || this.down('ArrowRight') || this.ctx.touch.leanFwd
       if (fwd) state.started = true
       this.throttle(fwd ? 1 : 0)
 
@@ -1359,6 +1361,7 @@ export class OrnnScene extends Phaser.Scene {
     this.updateCamera()
     this.ambientFx()
     this.updatePopups()
+    this.drawStars()
     this.syncSprites()
     this.applyCamera()
     this.drawWorld()
@@ -1409,14 +1412,15 @@ export class OrnnScene extends Phaser.Scene {
     } else if (!state.started) {
       targetZoom = 1.1 // idle at the start line
     } else {
-      targetZoom = 1.0 - (Math.min(spd, 1400) / 1400) * 0.18
+      // No speed-based zoom: fractional zoom renders the pixel bike soft/blurry
+      // at pace, so the camera holds scale 1 and only big air widens the view.
+      targetZoom = 1.0
       // Only sustained air widens the view — the grounded flag flickers over
       // jagged vertices and reacting to it makes the zoom pump.
       if (!this.grounded && this.curAirMs > 250 && state.terrain) {
         const h = state.terrain.groundY(p.x) - p.y
         if (h > 80) targetZoom -= Math.min((h - 80) / 900, 1) * 0.2
       }
-      if (state.nitroActive) targetZoom -= 0.06 // FOV punch
     }
     state.camera.x += (tx - state.camera.x) * 0.08
     state.camera.y += (ty - state.camera.y) * 0.08
@@ -1587,6 +1591,41 @@ export class OrnnScene extends Phaser.Scene {
   }
 
   // ---- screen-space chrome: axis labels, chip, tooltip, dates, speed -----
+  // Starry night: a fixed set of hash-placed stars drawn in identity screen
+  // space (same 1/zoom counter-transform as the chrome), wrapping with a slow
+  // parallax against the camera and a gentle per-star twinkle.
+  private drawStars(): void {
+    const cam = this.cameras.main
+    const zoom = cam.zoom
+    const w = this.scale.width
+    const h = this.scale.height
+    const inv = 1 / zoom
+    const cInX = w / 2, cInY = h / 2
+    const cOutX = Math.round(w / 2), cOutY = Math.round(h / 2)
+    const g = this.starGfx
+    g.setScale(inv).setPosition(cInX - cOutX * inv, cInY - cOutY * inv)
+    g.clear()
+    const t = this.ctx.state.timeMs
+    const camX = this.ctx.state.camera.x
+    const camY = this.ctx.state.camera.y
+    for (let i = 0; i < 140; i++) {
+      // cheap per-star hash → stable position, size, phase, tint
+      const hx = ((i * 2654435761) >>> 0) % 10000 / 10000
+      const hy = ((i * 1597334677) >>> 0) % 10000 / 10000
+      const layer = i % 3 // three parallax depths
+      const par = 0.05 + layer * 0.05
+      let x = (hx * w * 1.4 - camX * par) % (w * 1.4)
+      if (x < 0) x += w * 1.4
+      x -= w * 0.2
+      let y = (hy * h - camY * par * 0.5) % h
+      if (y < 0) y += h
+      const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.0011 + i * 1.7))
+      const size = layer === 2 ? 2 : 1
+      g.fillStyle(i % 11 === 0 ? 0x34d97b : 0xf5f5f5, tw * (0.25 + layer * 0.12))
+      g.fillRect(Math.round(x), Math.round(y), size, size)
+    }
+  }
+
   private drawChrome(): void {
     const state = this.ctx.state
     const t = state.terrain
