@@ -156,6 +156,7 @@ export function startGame(
       distance: Math.round(state.distance / 10),
       coins: state.points,
       flips: state.flips,
+      timeMs: Math.round(state.timeMs),
       finished: state.phase === 'finished',
     })
   }

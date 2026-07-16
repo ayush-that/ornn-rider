@@ -16,6 +16,7 @@ export const submitRun = mutation({
     // legacy `coins` field name to avoid a schema migration.
     coins: v.number(),
     flips: v.number(),
+    timeMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -24,6 +25,7 @@ export const submitRun = mutation({
     const distance = Math.max(0, Math.min(Math.round(args.distance), 1_000_000));
     const coins = Math.max(0, Math.min(Math.round(args.coins), 100_000));
     const flips = Math.max(0, Math.min(Math.round(args.flips), 10_000));
+    const timeMs = Math.max(0, Math.min(Math.round(args.timeMs ?? 0), 86_400_000));
     // The leaderboard ranks by points, full stop.
     const score = coins;
     await ctx.db.insert("scores", {
@@ -34,6 +36,7 @@ export const submitRun = mutation({
       distance,
       coins,
       flips,
+      timeMs,
       score,
       createdAt: Date.now(),
     });
@@ -76,6 +79,7 @@ export const topRuns = query({
           distance: row.distance,
           coins: row.coins,
           flips: row.flips,
+          timeMs: row.timeMs ?? 0,
           score: row.score,
           createdAt: row.createdAt,
         };

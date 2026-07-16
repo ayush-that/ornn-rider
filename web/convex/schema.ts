@@ -28,6 +28,7 @@ export default defineSchema({
     distance: v.number(),
     coins: v.number(),
     flips: v.number(),
+    timeMs: v.optional(v.number()),
     score: v.number(),
     createdAt: v.number(),
   })

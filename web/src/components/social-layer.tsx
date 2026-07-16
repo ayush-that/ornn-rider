@@ -10,6 +10,12 @@ import { api } from "../../convex/_generated/api";
 
 const PENDING_KEY = "ornn-rider-pending-run";
 
+function fmtTime(ms: number): string {
+  if (!ms) return "—";
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 const CATS: { id: TrackCategory; label: string }[] = [
   { id: "compute", label: "COMPUTE" },
   { id: "memory", label: "MEMORY" },
@@ -61,6 +67,7 @@ export function SocialLayer({ lastRun }: { lastRun: RunResult | null }) {
       distance: run.distance,
       coins: run.coins,
       flips: run.flips,
+      timeMs: run.timeMs,
     })
       .then(() => setPosted(run))
       .catch(() => {
@@ -267,6 +274,7 @@ function Leaderboard({
                   <th className="py-1.5 pr-2 font-semibold">RIDER</th>
                   {trackId === null ? <th className="py-1.5 pr-2 font-semibold">TRACK</th> : null}
                   <th className="py-1.5 pr-2 text-right font-semibold">DIST</th>
+                  <th className="py-1.5 pr-2 text-right font-semibold">TIME</th>
                   <th className="py-1.5 pr-2 text-right font-semibold">FLIPS</th>
                   <th className="py-1.5 text-right font-semibold">POINTS</th>
                 </tr>
@@ -291,6 +299,7 @@ function Leaderboard({
                       <td className="py-2 pr-2 text-[#909090]">{r.trackId.split(":")[1]}</td>
                     ) : null}
                     <td className="py-2 pr-2 text-right tabular-nums">{r.distance}m</td>
+                    <td className="py-2 pr-2 text-right text-[#909090] tabular-nums">{fmtTime(r.timeMs)}</td>
                     <td className="py-2 pr-2 text-right tabular-nums">{r.flips}</td>
                     <td className="py-2 text-right font-semibold text-[#f5a524] tabular-nums">
                       {r.score}
