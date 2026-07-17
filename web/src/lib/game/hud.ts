@@ -34,7 +34,7 @@ const CSS = `
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
   font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
-  color: ${C.dim}; padding: 9px 18px; transition: color .12s, border-color .12s;
+  color: ${C.dim}; padding: 6px 12px; transition: color .12s, border-color .12s;
 }
 .oh-cat:hover { color: #c8c8c8; }
 .oh-cat.active { color: ${C.text}; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
@@ -43,7 +43,7 @@ const CSS = `
   pointer-events: auto; cursor: pointer;
   background: #0c0c0c; border: 2px solid #262626; border-radius: 0;
   font-family: inherit; font-size: 13px; line-height: 1.4; color: ${C.dim};
-  padding: 10px 20px; transition: color .12s, border-color .12s;
+  padding: 6px 12px; transition: color .12s, border-color .12s;
 }
 .oh-tab:hover { color: #c8c8c8; }
 .oh-tab.active { color: ${C.text}; font-weight: 600; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }

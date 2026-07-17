@@ -93,6 +93,41 @@ const NITRO_PER_FLIP = 0.2
 const NITRO_ARM = 0.10 // min charge to (re)start a boost — hysteresis vs empty-tank stutter
 const NITRO_FORCE = 0.0027 // ~3x the peak trend-wind force per step
 
+// --- Tricks & streak scoring -----------------------------------------------
+// Every trick is a micro-interaction: a floating popup + a bit of camera juice.
+// Chaining tricks within STREAK_WINDOW_MS builds a multiplier (×1..×5) applied
+// to all TRICK points (never to pickup coins). A crash — or a quiet lapse past
+// the window — drops the streak back to ×1.
+const STREAK_WINDOW_MS = 7000
+const STREAK_MAX = 5
+// Air-time tiers (awarded on a clean landing only when NO flip happened that
+// air): highest reached tier fires, not all three.
+const AIR_NOHANDER_MS = 1200, AIR_NOHANDER_PTS = 10
+const AIR_SUPERMAN_MS = 2000, AIR_SUPERMAN_PTS = 20
+const AIR_SAILOR_MS = 3000, AIR_SAILOR_PTS = 40
+// Ground tricks (per-wheel contact asymmetry). Held tricks re-award each block.
+// GRACE: jagged terrain flickers the front/back wheel in and out of contact, so
+// the pose timer tolerates brief breaks (a bump, a hop) before it resets — as
+// long as the bike is still on the driving wheel, the wheelie/stoppie holds.
+const WHEELIE_MS = 900, WHEELIE_PTS = 15, WHEELIE_MIN_SPEED = 120
+const STOPPIE_MS = 700, STOPPIE_PTS = 20, STOPPIE_MIN_SPEED = 120
+const GROUND_TRICK_GRACE = 350
+// Speed demon reads a SMOOTHED speed (the raw px/s spikes wildly frame-to-frame
+// over jagged chart terrain, so a raw threshold never sustains). Hysteresis:
+// accumulate above HI, only reset below LO, hold in between — so a single bump
+// dip doesn't wipe a near-complete run.
+const SPEED_DEMON_MS = 3000, SPEED_DEMON_PTS = 25
+const SPEED_DEMON_HI = 620, SPEED_DEMON_LO = 430
+const SPEED_SMOOTH = 0.12 // EMA weight per physics step
+const FLIP_PTS = 25
+// Named one-shot combos (amber popup, big scale, strong shake). Flat bonuses,
+// not streak-multiplied (they are already large lump sums).
+const ASTRONAUT_PTS = 100 // 2+ flips in one air
+const MADMAN_PTS = 250 // 3+ flips in one air (replaces Astronaut that air)
+const SHOWOFF_PTS = 150 // 3 different trick TYPES within one streak
+// Trick-type bits, tracked per streak for SHOWOFF.
+const TT_FLIP = 1, TT_WHEELIE = 2, TT_STOPPIE = 4, TT_AIR = 8, TT_SPEED = 16
+
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v
 }
@@ -249,6 +284,10 @@ export class OrnnScene extends Phaser.Scene {
 
   // bike readonly-facing state
   private contacts = 0
+  // per-wheel contact counts (ground-trick detection needs the asymmetry;
+  // `contacts` is aggregate and can't tell a wheelie from a stoppie)
+  private backContacts = 0
+  private frontContacts = 0
   private grounded = false
   private crashed = false
   private headHit = false
@@ -270,6 +309,7 @@ export class OrnnScene extends Phaser.Scene {
   private pendingFlips = 0
   private lastFlipDir = 1
   private parked = false
+  private invertedMs = 0
   private lastAngle = 0
   private resultsShown = false
   private outcomeAt = 0
@@ -277,6 +317,18 @@ export class OrnnScene extends Phaser.Scene {
   private prevNitroActive = false
   private nitroLatch = false
   private ejectCamUntil = 0
+
+  // tricks & streak (reset on every respawn / crash via clearRunFlags)
+  private streak = 1
+  private lastTrickMs = -1e9
+  private streakTypes = 0 // bitmask of TT_* seen in the current streak
+  private showoffDone = false // SHOWOFF fires once per streak
+  private wheelieMs = 0 // continuous held-trick timers
+  private wheelieGrace = 0
+  private stoppieMs = 0
+  private stoppieGrace = 0
+  private speedDemonMs = 0
+  private smoothSpeed = 0 // EMA of |speed| for stable speed-demon detection
 
   // fixed-timestep accumulator
   private acc = 0
@@ -343,20 +395,32 @@ export class OrnnScene extends Phaser.Scene {
     this.matter.world.on('collisionstart', (e: { pairs: MatterJS.IPair[] }) => {
       const pairs = e.pairs
       for (let i = 0; i < pairs.length; i++) {
-        const a = (pairs[i].bodyA as unknown as Body).label
-        const b = (pairs[i].bodyB as unknown as Body).label
+        const ba = pairs[i].bodyA as unknown as Body
+        const bb = pairs[i].bodyB as unknown as Body
+        const a = ba.label, b = bb.label
         if (a !== 'terrain' && b !== 'terrain') continue
-        if (a === 'wheel' || b === 'wheel') this.contacts++
+        if (a === 'wheel' || b === 'wheel') {
+          this.contacts++
+          const wheel = a === 'wheel' ? ba : bb
+          if (wheel === this.wheelBack) this.backContacts++
+          else if (wheel === this.wheelFront) this.frontContacts++
+        }
         if (a === 'head' || b === 'head') this.headHit = true
       }
     })
     this.matter.world.on('collisionend', (e: { pairs: MatterJS.IPair[] }) => {
       const pairs = e.pairs
       for (let i = 0; i < pairs.length; i++) {
-        const a = (pairs[i].bodyA as unknown as Body).label
-        const b = (pairs[i].bodyB as unknown as Body).label
+        const ba = pairs[i].bodyA as unknown as Body
+        const bb = pairs[i].bodyB as unknown as Body
+        const a = ba.label, b = bb.label
         if (a !== 'terrain' && b !== 'terrain') continue
-        if (a === 'wheel' || b === 'wheel') this.contacts = Math.max(0, this.contacts - 1)
+        if (a === 'wheel' || b === 'wheel') {
+          this.contacts = Math.max(0, this.contacts - 1)
+          const wheel = a === 'wheel' ? ba : bb
+          if (wheel === this.wheelBack) this.backContacts = Math.max(0, this.backContacts - 1)
+          else if (wheel === this.wheelFront) this.frontContacts = Math.max(0, this.frontContacts - 1)
+        }
       }
     })
 
@@ -469,6 +533,8 @@ export class OrnnScene extends Phaser.Scene {
     this.wheelFrontSprite.setVisible(false)
     this.built = false
     this.contacts = 0
+    this.backContacts = 0
+    this.frontContacts = 0
     this.grounded = false
     this.crashed = false
     this.headHit = false
@@ -615,7 +681,7 @@ export class OrnnScene extends Phaser.Scene {
       const m = markers[i]
       const c = this.add.image(m.x, m.y - 40, 'coin').setDepth(4)
       // Uniform size for every pickup; tint alone tells them apart.
-      c.setScale(20 / 24)
+      c.setScale(1.15)
       if (value === -1) c.setTint(0x5ad1ff) // nitro: cyan canister
       else if (value === 50) c.setTint(0xffd766)
       this.coinSprites.push(c)
@@ -646,6 +712,17 @@ export class OrnnScene extends Phaser.Scene {
     this.crashed = false
     this.killed = false
     this.headHit = false
+    // reset the trick/streak machine: a crash (or fresh spawn) drops it to ×1
+    this.streak = 1
+    this.lastTrickMs = -1e9
+    this.streakTypes = 0
+    this.showoffDone = false
+    this.wheelieMs = 0
+    this.wheelieGrace = 0
+    this.stoppieMs = 0
+    this.stoppieGrace = 0
+    this.speedDemonMs = 0
+    this.smoothSpeed = 0
     this.bikeView.ejected = false
     this.ragdollSprite.setVisible(false)
     this.riderSprite.setVisible(true)
@@ -707,6 +784,8 @@ export class OrnnScene extends Phaser.Scene {
     place(this.wheelFront, FRONT_DX, WHEEL_DY)
     place(this.riderHead, HEAD_DX, HEAD_DY)
     this.contacts = 0
+    this.backContacts = 0
+    this.frontContacts = 0
     this.grounded = false
     this.crashed = false
     this.headHit = false
@@ -845,6 +924,7 @@ export class OrnnScene extends Phaser.Scene {
     this.prevGrounded = grounded
 
     if (playing) {
+      this.updateGroundTricks()
       this.collectCredits(bx, chassis.position.y)
       const d = bx - this.startX
       if (d > state.distance) state.distance = d
@@ -855,7 +935,10 @@ export class OrnnScene extends Phaser.Scene {
         this.crashed = true
       }
       if (this.crashed) this.onCrash()
-      else if (bx >= state.terrain!.endX) this.onFinish()
+      // Finish slightly BEFORE the flag: the right containment wall starts at
+      // the last terrain point, so requiring bx >= endX exactly left the flag
+      // physically unreachable (chassis blocked half a bike short of the line).
+      else if (bx >= state.terrain!.endX - 120) this.onFinish()
     }
   }
 
@@ -935,6 +1018,16 @@ export class OrnnScene extends Phaser.Scene {
     // The constraint solver re-injects ~0.1 px/step of spring jitter after the
     // park snap, so a parked bike would still read 1 km/h without this.
     this._speed = this.parked ? 0 : this.chassis.speed * 60
+    // Settled upside down = dead. The head-contact crash only fires on a NEW
+    // collision while pitched past the gate; a wreck that slides into an
+    // inverted rest keeps its old contact and never re-triggers, leaving the
+    // rider planted head-first forever. A short timer catches that state.
+    if (this.ctx.state.phase === 'playing' && this.grounded && this.tilt() > 2.4) {
+      this.invertedMs += STEP
+      if (this.invertedMs > 900) this.crashed = true
+    } else {
+      this.invertedMs = 0
+    }
     this._rpm = Math.min(Math.abs(this.wheelBack.angularVelocity) / MAX_WHEEL_AV, 1)
     if (this.headHit) {
       // Only a real wipeout kills: head contact while the bike is pitched past
@@ -1028,13 +1121,14 @@ export class OrnnScene extends Phaser.Scene {
           // nitro canister: half a tank, even mid-boost
           state.nitro = clamp(state.nitro + 0.5, 0, 1)
           this.popup(m.x, m.y - 56, 'NITRO', 0x5ad1ff)
+          if (!this.ctx.isMuted()) this.ctx.audio.canister()
         } else {
           state.points += value
           if (!state.nitroActive) state.nitro = clamp(state.nitro + NITRO_PER_COIN, 0, 1)
           this.popup(m.x, m.y - 56, `+${value}`, value >= 50 ? 0xffd766 : 0x34d97b)
+          if (!this.ctx.isMuted()) this.ctx.audio.pickup(value)
         }
         this.coinSprites[j]?.setVisible(false)
-        if (!this.ctx.isMuted()) this.ctx.audio.coin()
         this.ePickup.emitParticleAt(m.x, m.y - 40, value === -1 || value >= 50 ? 16 : 10)
       }
     }
@@ -1051,6 +1145,7 @@ export class OrnnScene extends Phaser.Scene {
         this.lastFlipDir = Math.sign(this.flipAccum)
         this.flipAccum -= Math.sign(this.flipAccum) * TWO_PI
         // mid-air micro-feedback the instant the rotation completes
+        if (!this.ctx.isMuted()) this.ctx.audio.flip()
         this.popup(
           this.chassis.position.x,
           this.chassis.position.y - 70,
@@ -1072,19 +1167,135 @@ export class OrnnScene extends Phaser.Scene {
       this.eDust.emitParticleAt(this.wheelBack.position.x, this.wheelBack.position.y + 18, 3 + (mag * 5) | 0)
       this.addShake(impact * 0.35)
     }
-    if (this.pendingFlips > 0 && state.phase === 'playing') {
-      const bonus = this.pendingFlips * 25
-      state.flips += this.pendingFlips
-      state.points += bonus
-      if (!state.nitroActive) state.nitro = clamp(state.nitro + this.pendingFlips * NITRO_PER_FLIP, 0, 1)
-      if (!this.ctx.isMuted()) { this.ctx.audio.ping(); this.ctx.audio.boost() }
-      this.eBoost.emitParticleAt(this.chassis.position.x, this.chassis.position.y - 24, 8)
-      // landed it: bank the points with a bigger pop
-      this.popup(this.chassis.position.x, this.chassis.position.y - 64, `+${bonus}`, 0xf5a524, 1.25)
-      this.addShake(2.5)
+    if (state.phase === 'playing') {
+      if (this.pendingFlips > 0) {
+        const flips = this.pendingFlips
+        state.flips += flips
+        // Each flip is its own trick: it advances the streak, and every flip's
+        // +25 is scaled by the multiplier at the moment it's counted, so a
+        // multi-flip both builds and cashes in the same landing.
+        let bonus = 0, mult = this.streak
+        for (let i = 0; i < flips; i++) { mult = this.bumpStreak(TT_FLIP); bonus += FLIP_PTS * mult }
+        state.points += bonus
+        if (!state.nitroActive) state.nitro = clamp(state.nitro + flips * NITRO_PER_FLIP, 0, 1)
+        if (!this.ctx.isMuted()) {
+          this.ctx.audio.land(bonus)
+          if (mult > 1) this.ctx.audio.streak(mult)
+        }
+        this.eBoost.emitParticleAt(this.chassis.position.x, this.chassis.position.y - 24, 8)
+        // one popup for the banked flip points; one for the streak level reached
+        this.popup(this.chassis.position.x, this.chassis.position.y - 64, `+${bonus}`, 0xf5a524, 1.25)
+        this.streakPopup(mult)
+        this.addShake(2.5)
+        // named one-shot combos for stacking flips in a single air
+        if (flips >= 3) this.awardCombo(MADMAN_PTS, 'MADMAN')
+        else if (flips >= 2) this.awardCombo(ASTRONAUT_PTS, 'ASTRONAUT')
+        this.checkShowoff()
+      } else {
+        // No flip this air — award the highest air-time tier reached.
+        const air = this.curAirMs
+        if (air >= AIR_SAILOR_MS) this.award(TT_AIR, AIR_SAILOR_PTS, 'DEAD SAILOR', 0x34d97b)
+        else if (air >= AIR_SUPERMAN_MS) this.award(TT_AIR, AIR_SUPERMAN_PTS, 'SUPERMAN', 0xffffff)
+        else if (air >= AIR_NOHANDER_MS) this.award(TT_AIR, AIR_NOHANDER_PTS, 'NO-HANDER', 0xffffff)
+      }
     }
     this.pendingFlips = 0
     this.flipAccum = 0
+  }
+
+  // ---- tricks & streak ---------------------------------------------------
+  // Advance the streak for one trick of `type`, returning the current
+  // multiplier (1..STREAK_MAX). Chains if within the window, else starts a
+  // fresh chain (also how a >window lapse silently decays the streak to ×1).
+  private bumpStreak(type: number): number {
+    const now = this.ctx.state.timeMs
+    if (now - this.lastTrickMs <= STREAK_WINDOW_MS) {
+      if (this.streak < STREAK_MAX) this.streak++
+    } else {
+      this.streak = 1
+      this.streakTypes = 0
+      this.showoffDone = false
+    }
+    this.lastTrickMs = now
+    this.streakTypes |= type
+    return this.streak
+  }
+
+  // "×N STREAK" in green at the bike, a touch bigger each level. Only shown
+  // once the chain is actually multiplying (×2+), never for a fresh ×1.
+  private streakPopup(mult: number): void {
+    if (mult < 2) return
+    this.popup(this.chassis.position.x, this.chassis.position.y - 92, `×${mult} STREAK`, 0x34d97b, 1 + mult * 0.07)
+  }
+
+  // A single non-flip trick award: bump streak, bank the multiplied points,
+  // one popup for the trick + one for the streak level, then check SHOWOFF.
+  private award(type: number, base: number, name: string, tint: number): void {
+    const before = this.streak
+    const mult = this.bumpStreak(type)
+    const pts = base * mult
+    this.ctx.state.points += pts
+    this.popup(this.chassis.position.x, this.chassis.position.y - 64, `${name} +${pts}`, tint, 1.1)
+    if (mult > before) this.streakPopup(mult)
+    this.addShake(2)
+    if (!this.ctx.isMuted()) {
+      this.ctx.audio.land(pts)
+      if (mult > before) this.ctx.audio.streak(mult)
+    }
+    this.checkShowoff()
+  }
+
+  // Named one-shot combo: a flat amber lump sum with a big pop and hard shake.
+  private awardCombo(pts: number, name: string): void {
+    this.ctx.state.points += pts
+    this.popup(this.chassis.position.x, this.chassis.position.y - 108, `${name} +${pts}`, 0xf5a524, 1.4)
+    this.addShake(7)
+    if (!this.ctx.isMuted()) this.ctx.audio.combo()
+  }
+
+  // SHOWOFF: 3+ distinct trick types within the current streak, once per streak.
+  private checkShowoff(): void {
+    if (this.showoffDone) return
+    let n = 0, m = this.streakTypes
+    while (m) { n += m & 1; m >>= 1 }
+    if (n >= 3) {
+      this.showoffDone = true
+      this.awardCombo(SHOWOFF_PTS, 'SHOWOFF')
+    }
+  }
+
+  // Per-step ground-trick detection (playing + grounded). Wheelie/stoppie read
+  // per-wheel contact asymmetry; speed demon reads sustained top-end speed.
+  // Held tricks re-award every full interval so a long hold keeps paying out.
+  private updateGroundTricks(): void {
+    const spd = this._speed
+    const vx = this.chassis.velocity.x
+    const back = this.backContacts > 0
+    const front = this.frontContacts > 0
+    // WHEELIE: riding on the back wheel, nose up, rolling forward. The bike must
+    // still be on its back wheel for the grace to hold — a full launch (back
+    // wheel clears too) or a level-out (front plants) is a real break.
+    if (back && !front && vx > 0 && spd > WHEELIE_MIN_SPEED) {
+      this.wheelieMs += STEP
+      this.wheelieGrace = 0
+      if (this.wheelieMs >= WHEELIE_MS) { this.wheelieMs -= WHEELIE_MS; this.award(TT_WHEELIE, WHEELIE_PTS, 'WHEELIE', 0xffffff) }
+    } else if (this.wheelieMs > 0 && !front && vx > 0 && (this.wheelieGrace += STEP) <= GROUND_TRICK_GRACE) {
+      // back wheel bounced off a bump (brief airborne) but the nose is still up —
+      // hold the wheelie. A planted front (level-out) or a sustained launch breaks it.
+    } else { this.wheelieMs = 0; this.wheelieGrace = 0 }
+    // STOPPIE: balanced on the front wheel, back clear, still moving.
+    if (front && !back && spd > STOPPIE_MIN_SPEED) {
+      this.stoppieMs += STEP
+      this.stoppieGrace = 0
+      if (this.stoppieMs >= STOPPIE_MS) { this.stoppieMs -= STOPPIE_MS; this.award(TT_STOPPIE, STOPPIE_PTS, 'STOPPIE', 0xffffff) }
+    } else if (this.stoppieMs > 0 && !back && spd > STOPPIE_MIN_SPEED && (this.stoppieGrace += STEP) <= GROUND_TRICK_GRACE) {
+      // front wheel skipped off a bump but the back is still up — hold the stoppie.
+    } else { this.stoppieMs = 0; this.stoppieGrace = 0 }
+    this.smoothSpeed += (Math.abs(spd) - this.smoothSpeed) * SPEED_SMOOTH
+    if (this.smoothSpeed >= SPEED_DEMON_HI) {
+      this.speedDemonMs += STEP
+      if (this.speedDemonMs >= SPEED_DEMON_MS) { this.speedDemonMs -= SPEED_DEMON_MS; this.award(TT_SPEED, SPEED_DEMON_PTS, 'SPEED DEMON', 0x34d97b) }
+    } else if (this.smoothSpeed < SPEED_DEMON_LO) this.speedDemonMs = 0
   }
 
   private onCrash(): void {
@@ -1491,9 +1702,6 @@ export class OrnnScene extends Phaser.Scene {
       g.lineStyle(1.5, CN.bg0, 1)
       g.strokeCircle(sx(bx), dotY, 4)
     }
-
-    // speed lines
-    this.drawSpeedLines(g, w, h)
   }
 
   private dottedLine(g: Phaser.GameObjects.Graphics, x1: number, y1: number, x2: number, y2: number, dash: number, gap: number): void {
@@ -1507,26 +1715,6 @@ export class OrnnScene extends Phaser.Scene {
       g.moveTo(x1 + ux * d, y1 + uy * d)
       g.lineTo(x1 + ux * e, y1 + uy * e)
       d += dash + gap
-    }
-    g.strokePath()
-  }
-
-  private drawSpeedLines(g: Phaser.GameObjects.Graphics, w: number, h: number): void {
-    const speed = this._speed
-    const s = (speed - 520) / 90
-    if (s <= 0) return
-    const n = s > 9 ? 9 : s | 0
-    const len = 40 + s * 22
-    const timeMs = this.ctx.state.timeMs
-    g.lineStyle(2, 0xe6ece6, 0.16)
-    g.beginPath()
-    for (let k = 0; k < n; k++) {
-      const tY = (k * 137 + timeMs * 0.9) % (h + 200) - 100
-      const yl = (k * 71 + timeMs * 0.6) % h
-      g.moveTo(w - 6, tY)
-      g.lineTo(w - 6 - len, tY)
-      g.moveTo(6, yl)
-      g.lineTo(6 + len, yl)
     }
     g.strokePath()
   }
