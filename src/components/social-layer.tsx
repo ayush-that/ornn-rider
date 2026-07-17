@@ -10,6 +10,18 @@ import { api } from "../../convex/_generated/api";
 
 const PENDING_KEY = "ornn-rider-pending-run:v1";
 const LEGACY_PENDING_KEY = "ornn-rider-pending-run";
+const VIEWER_KEY = "ornn-rider-viewer:v1";
+
+type ViewerInfo = { name: string | null; username: string | null; image: string | null };
+
+function loadCachedViewer(): ViewerInfo | null {
+  try {
+    const raw = localStorage.getItem(VIEWER_KEY);
+    return raw ? (JSON.parse(raw) as ViewerInfo) : null;
+  } catch {
+    return null;
+  }
+}
 
 function fmtTime(ms: number): string {
   if (!ms) return "—";
@@ -53,8 +65,27 @@ export function SocialLayer({
   boardSignal?: number;
 }) {
   const { signIn, signOut } = useAuthActions();
-  const viewer = useQuery(api.leaderboard.viewer);
+  const liveViewer = useQuery(api.leaderboard.viewer);
   const submitRun = useMutation(api.leaderboard.submitRun);
+
+  // Optimistic chip: render the last-known viewer from localStorage while the
+  // Convex auth handshake runs, then reconcile with the live query result.
+  // Loaded in an effect (not the useState initializer) to avoid an SSR
+  // hydration mismatch.
+  const [cachedViewer, setCachedViewer] = useState<ViewerInfo | null>(null);
+  useEffect(() => {
+    setCachedViewer(loadCachedViewer());
+  }, []);
+  useEffect(() => {
+    if (liveViewer === undefined) return;
+    try {
+      if (liveViewer) localStorage.setItem(VIEWER_KEY, JSON.stringify(liveViewer));
+      else localStorage.removeItem(VIEWER_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [liveViewer]);
+  const viewer = liveViewer === undefined ? cachedViewer : liveViewer;
 
   const [boardOpen, setBoardOpen] = useState(false);
 
@@ -67,8 +98,9 @@ export function SocialLayer({
 
   const submittedRef = useRef<RunResult | null>(null);
 
-  const signedIn = viewer !== undefined && viewer !== null;
-  const authLoading = viewer === undefined;
+  const signedIn = viewer !== null;
+  // Run submission still waits for the live query — never trust the cache.
+  const authLoading = liveViewer === undefined;
 
   // Post the finished run once we know the player is signed in. If they are
   // not, stash it so it survives the OAuth redirect and posts after sign-in.
