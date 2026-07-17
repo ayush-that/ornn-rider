@@ -28,6 +28,28 @@ export const submitRun = mutation({
     const timeMs = Math.max(0, Math.min(Math.round(args.timeMs ?? 0), 86_400_000));
     // The leaderboard ranks by points, full stop.
     const score = coins;
+    // Upsert: one row per rider per track, keeping their best run. Without
+    // this every crash-resume posts a new row and pagination fills with
+    // duplicates of the same rider.
+    const mine = await ctx.db
+      .query("scores")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const existing = mine.find((r) => r.trackId === args.trackId);
+    if (existing) {
+      if (score <= existing.score) return existing.score;
+      await ctx.db.patch(existing._id, {
+        category: args.category,
+        range: args.range,
+        distance,
+        coins,
+        flips,
+        timeMs,
+        score,
+        createdAt: Date.now(),
+      });
+      return score;
+    }
     await ctx.db.insert("scores", {
       userId,
       trackId: args.trackId,

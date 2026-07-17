@@ -31,3 +31,29 @@ export const backfillScoreCategories = internalMutation({
     return patches.length;
   },
 });
+
+// One-off, idempotent: collapse duplicate rows to each rider's best per track
+// (submitRun used to insert a row per crash).
+export const dedupeScores = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("scores").collect();
+    const best = new Map<string, (typeof rows)[number]>();
+    let deleted = 0;
+    for (const row of rows) {
+      const key = `${row.userId ?? "anon"}:${row.trackId}`;
+      const prev = best.get(key);
+      if (!prev) {
+        best.set(key, row);
+      } else if (row.score > prev.score) {
+        await ctx.db.delete(prev._id);
+        best.set(key, row);
+        deleted += 1;
+      } else {
+        await ctx.db.delete(row._id);
+        deleted += 1;
+      }
+    }
+    return deleted;
+  },
+});
