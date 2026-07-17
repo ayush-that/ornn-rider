@@ -8,7 +8,8 @@ import { TRACKS } from "#/lib/game/data";
 
 import { api } from "../../convex/_generated/api";
 
-const PENDING_KEY = "ornn-rider-pending-run";
+const PENDING_KEY = "ornn-rider-pending-run:v1";
+const LEGACY_PENDING_KEY = "ornn-rider-pending-run";
 
 function fmtTime(ms: number): string {
   if (!ms) return "—";
@@ -31,7 +32,11 @@ const btn =
 
 function loadPendingRun(): RunResult | null {
   try {
-    const raw = localStorage.getItem(PENDING_KEY);
+    let raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_PENDING_KEY);
+      if (raw) localStorage.removeItem(LEGACY_PENDING_KEY);
+    }
     if (!raw) return null;
     const run = JSON.parse(raw) as RunResult;
     return typeof run.distance === "number" && typeof run.trackId === "string" ? run : null;
@@ -54,9 +59,12 @@ export function SocialLayer({
   const [boardOpen, setBoardOpen] = useState(false);
 
   // External open requests (e.g. the start page's LEADERBOARD button).
-  useEffect(() => {
+  const [prevBoardSignal, setPrevBoardSignal] = useState(0);
+  if (boardSignal !== prevBoardSignal) {
+    setPrevBoardSignal(boardSignal);
     if (boardSignal > 0) setBoardOpen(true);
-  }, [boardSignal]);
+  }
+
   const submittedRef = useRef<RunResult | null>(null);
 
   const signedIn = viewer !== undefined && viewer !== null;
@@ -104,15 +112,6 @@ export function SocialLayer({
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Mono',ui-monospace,monospace]">
       {/* top-right: repo + leaderboard + auth */}
       <div className="absolute top-[18px] right-6 flex items-center gap-2 max-sm:top-2 max-sm:right-2 max-sm:gap-1">
-        <a
-          href="https://ornn.com"
-          target="_blank"
-          rel="noreferrer"
-          className={`${btn} max-sm:hidden`}
-          title="market data by ornn"
-        >
-          DATA · ORNN.COM
-        </a>
         <a
           href="https://github.com/ayush-that/ornn-rider"
           target="_blank"

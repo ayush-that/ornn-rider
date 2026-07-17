@@ -11,12 +11,24 @@ import { createHud } from './hud'
 import { createAudio } from './audio'
 import { OrnnScene, type GameCtx } from './scene'
 
-const BEST_KEY = 'ornn-rider-best'
-const LAST_KEY = 'ornn-rider:last'
+const BEST_KEY = 'ornn-rider-best:v1'
+const LAST_KEY = 'ornn-rider:last:v1'
+
+// Read a versioned key, migrating any value left under the old unversioned key.
+function readVersioned(key: string, oldKey: string): string | null {
+  const raw = localStorage.getItem(key)
+  if (raw !== null) return raw
+  const old = localStorage.getItem(oldKey)
+  if (old !== null) {
+    localStorage.setItem(key, old)
+    localStorage.removeItem(oldKey)
+  }
+  return old
+}
 
 function loadBest(): Record<string, number> {
   try {
-    const raw = localStorage.getItem(BEST_KEY)
+    const raw = readVersioned(BEST_KEY, 'ornn-rider-best')
     if (raw) return JSON.parse(raw) as Record<string, number>
   } catch {
     /* ignore corrupt storage */
@@ -38,7 +50,7 @@ function loadLast(): { track: Track; range: GpuRange } {
     /* ignore */
   }
   try {
-    const raw = localStorage.getItem(LAST_KEY)
+    const raw = readVersioned(LAST_KEY, 'ornn-rider:last')
     if (raw) {
       const p = JSON.parse(raw) as { trackId?: string }
       if (p.trackId && TRACKS.some(t => t.id === p.trackId)) trackId = p.trackId

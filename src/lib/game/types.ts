@@ -8,7 +8,7 @@ export const DPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRa
 
 export interface SeriesPoint {
   t: number // unix ms
-  v: number // price in the track's unit ($/hr, $/unit or $/Mtok — see PRICE_UNIT)
+  v: number // price in the track's unit ($/hr, $/unit or $/Mtok per category)
 }
 
 // The three track families. compute = GPU rental ($/hr), memory = DRAM/NAND spot
@@ -38,13 +38,6 @@ export interface RunResult {
   flips: number
   timeMs: number // run duration
   finished: boolean
-}
-
-// Price-line unit suffix per category, shown in the header / tooltip.
-export const PRICE_UNIT: Record<TrackCategory, string> = {
-  compute: '/hr',
-  memory: '/unit',
-  tokens: '/Mtok',
 }
 
 export interface TerrainPoint {

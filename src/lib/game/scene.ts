@@ -985,10 +985,11 @@ export class OrnnScene extends Phaser.Scene {
     const MAX_FALL = 20 // px/step terminal velocity — capped low so a long drop
     // lands with a survivable impulse instead of blowing the wheels out of socket
     const MAX_HORIZ = 48 // px/step terminal horizontal speed
+    const B = this.matter.body
     for (const b of [this.chassis, this.wheelBack, this.wheelFront]) {
       const vx = clamp(b.velocity.x, -MAX_HORIZ, MAX_HORIZ)
       const vy = Math.min(b.velocity.y, MAX_FALL)
-      if (vx !== b.velocity.x || vy !== b.velocity.y) this.matter.body.setVelocity(b, { x: vx, y: vy })
+      if (vx !== b.velocity.x || vy !== b.velocity.y) B.setVelocity(b, { x: vx, y: vy })
     }
     const a = this.chassis.angle
     const cos = Math.cos(a)
@@ -1032,11 +1033,11 @@ export class OrnnScene extends Phaser.Scene {
       // recompose the clamped error back into world space
       const nex = cos * lat - sin * vert
       const ney = sin * lat + cos * vert
-      this.matter.body.setPosition(wheel, { x: sx + nex, y: sy + ney })
+      B.setPosition(wheel, { x: sx + nex, y: sy + ney })
       // Only reseats damp velocity toward the chassis; a hard reset on every
       // small nudge would inject constraint-fighting energy and read as jitter.
       if (hard) {
-        this.matter.body.setVelocity(wheel, {
+        B.setVelocity(wheel, {
           x: (wheel.velocity.x + this.chassis.velocity.x) * 0.5,
           y: (wheel.velocity.y + this.chassis.velocity.y) * 0.5,
         })
@@ -1551,11 +1552,15 @@ export class OrnnScene extends Phaser.Scene {
     const bob = Math.sin(this.ctx.state.timeMs * 0.005) * 4
     const coins = this.coinSprites
     const markers = this.ctx.state.terrain!.markers
-    for (let i = 0; i < coins.length; i++) {
+    const coinLeft = wv.x - 40
+    const coinRight = wv.right + 40
+    for (let i = pointIndex(markers, coinLeft); i < coins.length; i++) {
+      const m = markers[i]
+      if (m.x > coinRight) break
       const c = coins[i]
       if (!c || !c.visible) continue
-      if (markers[i].x < wv.x - 40 || markers[i].x > wv.right + 40) continue
-      c.y = markers[i].y - 40 + bob
+      if (m.x < coinLeft) continue
+      c.y = m.y - 40 + bob
     }
   }
 
@@ -1588,7 +1593,7 @@ export class OrnnScene extends Phaser.Scene {
     const mk = t.markers
     g.lineStyle(1 / zoom, CN.grid, 1)
     let lastVX = -1e9
-    for (let i = 0; i < mk.length; i++) {
+    for (let i = pointIndex(mk, left); i < mk.length; i++) {
       const m = mk[i]
       if (!m.dayBoundary) continue
       if (m.x < left) continue
@@ -1720,7 +1725,7 @@ export class OrnnScene extends Phaser.Scene {
     const left = wv.x - 80 / zoom
     const right = wv.right + 80 / zoom
     let lastLX = -1e9
-    for (let i = 0; i < mk.length; i++) {
+    for (let i = pointIndex(mk, left); i < mk.length; i++) {
       const m = mk[i]
       if (!m.dayBoundary) continue
       if (m.x < left) continue

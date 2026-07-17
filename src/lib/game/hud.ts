@@ -252,6 +252,7 @@ export function createHud(
   let activeRange: GpuRange = defaultRange(curCat.id)
 
   function renderCategory(cat: Category): void {
+    const rangeSet = new Set(cat.ranges)
     tabsEl.replaceChildren()
     tabBtns.clear()
     for (const track of cat.tracks) {
@@ -259,7 +260,7 @@ export function createHud(
       b.type = 'button'
       b.textContent = track.tab
       b.addEventListener('click', () => {
-        const range = cat.ranges.includes(activeRange) ? activeRange : defaultRange(cat.id)
+        const range = rangeSet.has(activeRange) ? activeRange : defaultRange(cat.id)
         onSelect(track, range)
       })
       tabsEl.appendChild(b)
@@ -372,21 +373,22 @@ export function createHud(
     if (!state.started && hintHidden) { hintHidden = false; hint.style.opacity = '1' }
 
     // Live ticker: header shows the price/date under the bike as you ride.
-    const lp = Math.round(state.livePrice * 1000)
-    if (lp !== lastLivePrice && state.livePrice > 0) {
+    const { livePrice, liveTimeMs, points, nitroActive } = state
+    const lp = Math.round(livePrice * 1000)
+    if (lp !== lastLivePrice && livePrice > 0) {
       lastLivePrice = lp
-      setPrice(state.livePrice)
+      setPrice(livePrice)
     }
-    if (state.liveTimeMs !== lastLiveT) {
-      lastLiveT = state.liveTimeMs
-      datetimeEl.textContent = state.liveTimeMs
-        ? `${HDR_DATE_FMT.format(state.liveTimeMs)} · ${HDR_TIME_FMT.format(state.liveTimeMs)}`
+    if (liveTimeMs !== lastLiveT) {
+      lastLiveT = liveTimeMs
+      datetimeEl.textContent = liveTimeMs
+        ? `${HDR_DATE_FMT.format(liveTimeMs)} · ${HDR_TIME_FMT.format(liveTimeMs)}`
         : ''
     }
 
     const dist = Math.round(state.distance / 10)
     if (dist !== lastDist) { lastDist = dist; sDist.textContent = `${dist} m` }
-    if (state.points !== lastCred) { lastCred = state.points; sCred.textContent = String(state.points) }
+    if (points !== lastCred) { lastCred = points; sCred.textContent = String(points) }
     const best = state.track ? (state.bestDistance[state.track.id] ?? 0) : 0
     if (best !== lastBest) { lastBest = best; sBest.textContent = fmtBest(best) }
     // Display calibration, not physics: raw is px/s; the literal 10px=1m scale
@@ -397,10 +399,10 @@ export function createHud(
     // Nitro meter fill; "armed" glow while boosting.
     const np = Math.round(state.nitro * 100)
     if (np !== lastNitro) { lastNitro = np; nitroFill.style.width = `${np}%` }
-    if (state.nitroActive !== lastArmed) {
-      lastArmed = state.nitroActive
-      nitro.classList.toggle('armed', state.nitroActive)
-      nitroBtn.classList.toggle('armed', state.nitroActive)
+    if (nitroActive !== lastArmed) {
+      lastArmed = nitroActive
+      nitro.classList.toggle('armed', nitroActive)
+      nitroBtn.classList.toggle('armed', nitroActive)
     }
   }
 

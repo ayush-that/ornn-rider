@@ -2,6 +2,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 
+import { env } from "#/env/client";
 import { convex } from "#/lib/convex";
 
 import appCss from "#/styles.css?url";
@@ -38,6 +39,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: "twitter:image", content: "https://engineerboyfriend.com/og-banner.png" },
     ],
     links: [
+      // Warm up DNS/TCP/TLS to the Convex deployment before the client connects.
+      { rel: "preconnect", href: env.VITE_CONVEX_URL },
       { rel: "icon", href: "/favicon.png" },
       { rel: "stylesheet", href: appCss },
     ],
