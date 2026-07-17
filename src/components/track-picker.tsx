@@ -13,7 +13,10 @@ export function TrackPicker({ onPick, onBack }: { onPick: (t: Track) => void; on
   const [cat, setCat] = useState<TrackCategory>("compute");
   const tracks = CATEGORIES.find((c) => c.id === cat)?.tracks ?? [];
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-[#050505] px-4 font-['Space_Mono',ui-monospace,monospace]">
+    <div className="absolute inset-0 z-10 flex overflow-y-auto bg-[#050505] px-4 font-['Space_Mono',ui-monospace,monospace]">
+      {/* m-auto centers when content fits and scrolls when it doesn't (short
+          landscape viewports). */}
+      <div className="m-auto flex flex-col items-center gap-6 py-10">
       <div className="text-[13px] font-bold tracking-[0.2em] text-[#e8e8e8]">PICK YOUR MARKET</div>
       <div className="flex gap-2">
         {CAT_LABELS.map((c) => (
@@ -48,6 +51,7 @@ export function TrackPicker({ onPick, onBack }: { onPick: (t: Track) => void; on
       >
         ← BACK
       </button>
+      </div>
     </div>
   );
 }

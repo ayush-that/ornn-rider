@@ -5,13 +5,16 @@ const startBtn =
 
 export function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderboard: () => void }) {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-8 bg-[#050505]">
-      <img
-        src="/logo.png"
-        alt="Engineer Boyfriend"
-        className="w-[min(420px,72vw)] select-none"
-        draggable={false}
-      />
+    <div className="absolute inset-0 z-10 flex overflow-y-auto bg-[#050505]">
+      {/* m-auto centers when content fits and allows scrolling when it doesn't
+          (short landscape viewports used to clip the buttons unreachably). */}
+      <div className="m-auto flex flex-col items-center gap-8 py-10">
+        <img
+          src="/logo.png"
+          alt="Engineer Boyfriend"
+          className="max-h-[42vh] w-[min(420px,72vw)] select-none object-contain"
+          draggable={false}
+        />
       <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Mono',ui-monospace,monospace] text-[13px] leading-relaxed text-[#909090]">
         Your girlfriend needs GPU clusters for her AI startup — and compute is not
         cheap. Be the engineer boyfriend: ride the live markets, collect chips, and
@@ -43,6 +46,7 @@ export function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onL
             ornn.com
           </a>
         </p>
+        </div>
       </div>
     </div>
   );
