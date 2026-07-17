@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 import { SocialLayer } from "#/components/social-layer";
-import type { RunResult } from "#/lib/game/types";
+import { CATEGORIES } from "#/lib/game/data";
+import type { Track, RunResult, TrackCategory } from "#/lib/game/types";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -27,7 +28,17 @@ function HomePage() {
   const uiRef = useRef<HTMLDivElement>(null);
   const [lastRun, setLastRun] = useState<RunResult | null>(null);
   const [started, setStarted] = useState(track !== undefined);
+  const [picking, setPicking] = useState(false);
   const [boardSignal, setBoardSignal] = useState(0);
+
+  function pickTrack(t: Track) {
+    // The game boots from the ?track deep link, so picking = setting the link.
+    const url = new URL(window.location.href);
+    url.searchParams.set("track", t.id);
+    window.history.replaceState(null, "", url);
+    setPicking(false);
+    setStarted(true);
+  }
 
   useEffect(() => {
     if (!started) return;
@@ -68,9 +79,11 @@ function HomePage() {
       {/* React layer: X sign-in, score submission, leaderboards (Convex). */}
       <SocialLayer lastRun={lastRun} boardSignal={boardSignal} />
 
-      {started ? null : (
+      {started ? null : picking ? (
+        <TrackPicker onPick={pickTrack} onBack={() => setPicking(false)} />
+      ) : (
         <StartPage
-          onStart={() => setStarted(true)}
+          onStart={() => setPicking(true)}
           onLeaderboard={() => setBoardSignal((n) => n + 1)}
         />
       )}
@@ -93,9 +106,10 @@ function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderbo
         draggable={false}
       />
       <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif] text-[13px] leading-relaxed text-[#909090]">
-        Every hill is a real market chart — GPU rental prices, DRAM spot prices, and
-        LLM token indices, full history. Ride the candles, grab points and nitro,
-        and chain flips and wheelies for streaks.
+        Your girlfriend needs GPU clusters for her AI startup — and compute is not
+        cheap. Be the engineer boyfriend: ride the live markets, collect chips, and
+        secure the compute. Every hill is a real chart — GPU rentals, DRAM spot
+        prices, and LLM token indices, full history.
       </p>
       <div className="flex flex-col items-center gap-3">
         <button
@@ -113,6 +127,55 @@ function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderbo
           LEADERBOARD
         </button>
       </div>
+    </div>
+  );
+}
+
+const CAT_LABELS: { id: TrackCategory; label: string }[] = [
+  { id: "compute", label: "COMPUTE" },
+  { id: "memory", label: "MEMORY" },
+  { id: "tokens", label: "TOKENS" },
+];
+
+function TrackPicker({ onPick, onBack }: { onPick: (t: Track) => void; onBack: () => void }) {
+  const [cat, setCat] = useState<TrackCategory>("compute");
+  const tracks = CATEGORIES.find((c) => c.id === cat)?.tracks ?? [];
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-[#050505] px-4 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">
+      <div className="text-[13px] font-bold tracking-[0.2em] text-[#e8e8e8]">PICK YOUR MARKET</div>
+      <div className="flex gap-2">
+        {CAT_LABELS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`pointer-events-auto cursor-pointer border-2 bg-[#0c0c0c] px-4 py-2 text-[11px] font-semibold tracking-[0.14em] transition-colors ${
+              cat === c.id ? "border-[#34d97b] text-[#34d97b]" : "border-[#262626] text-[#909090] hover:text-[#c8c8c8]"
+            }`}
+            onClick={() => setCat(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex max-w-[560px] flex-wrap items-center justify-center gap-2">
+        {tracks.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className="pointer-events-auto cursor-pointer border-2 border-[#262626] bg-[#0c0c0c] px-4 py-2.5 text-[12px] font-semibold tracking-[0.08em] text-[#c8c8c8] shadow-[3px_3px_0_rgba(0,0,0,0.65)] transition-colors hover:border-[#34d97b] hover:text-[#34d97b]"
+            onClick={() => onPick(t)}
+          >
+            {t.tab}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="pointer-events-auto cursor-pointer text-[11px] tracking-[0.14em] text-[#909090] hover:text-[#e8e8e8]"
+        onClick={onBack}
+      >
+        ← BACK
+      </button>
     </div>
   );
 }

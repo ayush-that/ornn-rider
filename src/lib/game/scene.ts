@@ -8,7 +8,7 @@
 // original matter-js code exactly.
 import * as Phaser from 'phaser'
 import type { GameState, Terrain, DayMarker, BikeView } from './types'
-import { CN } from './types'
+import { CN, DPR } from './types'
 import type { createHud } from './hud'
 import type { Audio } from './audio'
 
@@ -1431,7 +1431,7 @@ export class OrnnScene extends Phaser.Scene {
   private applyCamera(): void {
     const cam = this.cameras.main
     const c = this.ctx.state.camera
-    const zoom = c.zoom > 0 ? c.zoom : 1
+    const zoom = (c.zoom > 0 ? c.zoom : 1) * DPR // logical zoom on a physical-res canvas
     cam.setZoom(zoom)
     // Fold screen-space shake into the camera centre (world units).
     cam.centerOn(c.x + this.shx / zoom, c.y + this.shy / zoom)
@@ -1596,14 +1596,13 @@ export class OrnnScene extends Phaser.Scene {
   // parallax against the camera and a gentle per-star twinkle.
   private drawStars(): void {
     const cam = this.cameras.main
-    const zoom = cam.zoom
-    const w = this.scale.width
-    const h = this.scale.height
-    const inv = 1 / zoom
-    const cInX = w / 2, cInY = h / 2
-    const cOutX = Math.round(w / 2), cOutY = Math.round(h / 2)
+    const invP = 1 / cam.zoom
+    const w = this.scale.width / DPR // CSS px
+    const h = this.scale.height / DPR
+    const cInX = this.scale.width / 2, cInY = this.scale.height / 2
+    const cOutX = Math.round(cInX), cOutY = Math.round(cInY)
     const g = this.starGfx
-    g.setScale(inv).setPosition(cInX - cOutX * inv, cInY - cOutY * inv)
+    g.setScale(DPR * invP).setPosition(cInX - cOutX * invP, cInY - cOutY * invP)
     g.clear()
     const t = this.ctx.state.timeMs
     const camX = this.ctx.state.camera.x
@@ -1632,9 +1631,9 @@ export class OrnnScene extends Phaser.Scene {
     if (!t) return
     const cam = this.cameras.main
     const wv = cam.worldView
-    const zoom = cam.zoom
-    const w = this.scale.width
-    const h = this.scale.height
+    const zoom = cam.zoom / DPR // world → CSS px
+    const w = this.scale.width / DPR // CSS px
+    const h = this.scale.height / DPR
     const sx = (wx: number): number => (wx - wv.x) * zoom
     const sy = (wy: number): number => (wy - wv.y) * zoom
     // The main camera applies its dynamic zoom (speed/air/nitro/crash) to every
@@ -1649,20 +1648,20 @@ export class OrnnScene extends Phaser.Scene {
     // (zooming) chart via sy(). placeUI positions a text so its anchor lands at
     // the given true screen (X, Y); g is transformed so its draws use raw screen
     // coordinates too.
-    const inv = 1 / zoom
-    const cInX = w / 2, cInY = h / 2
-    const cOutX = Math.round(w / 2), cOutY = Math.round(h / 2)
+    const invP = 1 / cam.zoom
+    const cInX = this.scale.width / 2, cInY = this.scale.height / 2
+    const cOutX = Math.round(cInX), cOutY = Math.round(cInY)
     const placeUI = (txt: Phaser.GameObjects.Text, X: number, Y: number): void => {
       // Snap to whole screen pixels: the chrome is scaled by 1/zoom, so at
       // fractional (zoomed-out / high-speed) zoom an unrounded target lands on a
       // sub-pixel position and the glyphs render soft/blurry. Rounding the target
       // keeps the anchor on an integer pixel so text stays crisp at every zoom.
-      X = Math.round(X); Y = Math.round(Y)
-      txt.setScale(inv).setPosition(cInX + (X - cOutX) * inv, cInY + (Y - cOutY) * inv)
+      X = Math.round(X * DPR); Y = Math.round(Y * DPR)
+      txt.setScale(DPR * invP).setPosition(cInX + (X - cOutX) * invP, cInY + (Y - cOutY) * invP)
     }
 
     const g = this.chromeGfx
-    g.setScale(inv).setPosition(cInX - cOutX * inv, cInY - cOutY * inv)
+    g.setScale(DPR * invP).setPosition(cInX - cOutX * invP, cInY - cOutY * invP)
     g.clear()
 
     // horizontal price-level grid lines + right-edge labels. Each line's screen
