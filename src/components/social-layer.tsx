@@ -1,4 +1,4 @@
-import { SiX } from "@icons-pack/react-simple-icons";
+import { SiGithub, SiX } from "@icons-pack/react-simple-icons";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
@@ -105,8 +105,17 @@ export function SocialLayer({ lastRun }: { lastRun: RunResult | null }) {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">
-      {/* top-right: leaderboard + auth */}
+      {/* top-right: repo + leaderboard + auth */}
       <div className="absolute top-[18px] right-6 flex items-center gap-2">
+        <a
+          href="https://github.com/ayush-that/ornn-rider"
+          target="_blank"
+          rel="noreferrer"
+          className={`${btn} flex items-center`}
+          title="source on github"
+        >
+          <SiGithub size={13} />
+        </a>
         <button type="button" className={btn} onClick={() => setBoardOpen((v) => !v)}>
           LEADERBOARD
         </button>
