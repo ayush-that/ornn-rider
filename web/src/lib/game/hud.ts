@@ -296,7 +296,7 @@ export function createHud(
 
   const hint = el('div', '')
   hint.id = 'oh-hint'
-  hint.innerHTML = 'Press <b>→</b> to ride · <b>Shift</b> nitro'
+  hint.innerHTML = '<b>W</b> gas · <b>A</b> wheelie · <b>D</b> nose dive · <b>Shift</b> nitro'
 
   // Nitro meter (amber fill) + a touch boost button for coarse pointers.
   const nitro = el('div', '')
