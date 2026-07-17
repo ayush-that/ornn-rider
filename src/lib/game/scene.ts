@@ -91,7 +91,7 @@ const NITRO_TRICKLE = 0.05 // per second, always
 const NITRO_PER_COIN = 0.08
 const NITRO_PER_FLIP = 0.35
 const NITRO_ARM = 0.10 // min charge to (re)start a boost — hysteresis vs empty-tank stutter
-const NITRO_FORCE = 0.0032 // ~3.5x the peak trend-wind force per step
+const NITRO_FORCE = 0.0029 // ~3x the peak trend-wind force per step
 
 // --- Tricks & streak scoring -----------------------------------------------
 // Every trick is a micro-interaction: a floating popup + a bit of camera juice.
