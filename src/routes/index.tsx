@@ -92,6 +92,12 @@ function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderbo
         className="w-[min(420px,72vw)] select-none"
         draggable={false}
       />
+      <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif] text-[13px] leading-relaxed text-[#909090]">
+        Every hill is a real market chart — GPU rental prices, DRAM spot prices, and
+        LLM token indices, full history. Ride the candles, grab points and nitro,
+        chain flips and wheelies for streaks, and post your run to the leaderboard
+        with your X account.
+      </p>
       <div className="flex flex-col items-center gap-3">
         <button
           type="button"
