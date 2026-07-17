@@ -32,6 +32,7 @@ export interface RunResult {
   distance: number
   coins: number
   flips: number
+  timeMs: number // run duration
   finished: boolean
 }
 
