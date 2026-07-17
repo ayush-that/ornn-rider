@@ -292,6 +292,12 @@ export class OrnnScene extends Phaser.Scene {
   private grounded = false
   private crashed = false
   private headHit = false
+  // Level-triggered terrain contact for the non-wheel bodies. The old headHit
+  // edge flag misses the "graze at low pitch, then rotate inverted while the
+  // contact persists" wreck — no new collisionstart ever fires, so the rider
+  // could plant head-first forever. Counters mirror `contacts` for wheels.
+  private headContacts = 0
+  private chassisContacts = 0
   private _speed = 0
   private _rpm = 0
   private bikeView!: BikeView
@@ -450,7 +456,8 @@ export class OrnnScene extends Phaser.Scene {
           if (wheel === this.wheelBack) this.backContacts++
           else if (wheel === this.wheelFront) this.frontContacts++
         }
-        if (a === 'head' || b === 'head') this.headHit = true
+        if (a === 'head' || b === 'head') { this.headHit = true; this.headContacts++ }
+        if (a === 'chassis' || b === 'chassis') this.chassisContacts++
       }
     })
     this.matter.world.on('collisionend', (e: { pairs: MatterJS.IPair[] }) => {
@@ -466,10 +473,15 @@ export class OrnnScene extends Phaser.Scene {
           if (wheel === this.wheelBack) this.backContacts = Math.max(0, this.backContacts - 1)
           else if (wheel === this.wheelFront) this.frontContacts = Math.max(0, this.frontContacts - 1)
         }
+        if (a === 'head' || b === 'head') this.headContacts = Math.max(0, this.headContacts - 1)
+        if (a === 'chassis' || b === 'chassis') this.chassisContacts = Math.max(0, this.chassisContacts - 1)
       }
     })
 
     this.built = false
+    // dev-only handle: lets a console/test script force poses (e.g. drop the
+    // bike inverted) to exercise crash detection without stunt-input luck
+    if (import.meta.env.DEV) (window as unknown as { __scene: unknown }).__scene = this
     this.ctx.onReady()
   }
 
@@ -581,6 +593,8 @@ export class OrnnScene extends Phaser.Scene {
     this.contacts = 0
     this.backContacts = 0
     this.frontContacts = 0
+    this.headContacts = 0
+    this.chassisContacts = 0
     this.grounded = false
     this.crashed = false
     this.headHit = false
@@ -832,6 +846,8 @@ export class OrnnScene extends Phaser.Scene {
     this.contacts = 0
     this.backContacts = 0
     this.frontContacts = 0
+    this.headContacts = 0
+    this.chassisContacts = 0
     this.grounded = false
     this.crashed = false
     this.headHit = false
@@ -1075,29 +1091,27 @@ export class OrnnScene extends Phaser.Scene {
     // The constraint solver re-injects ~0.1 px/step of spring jitter after the
     // park snap, so a parked bike would still read 1 km/h without this.
     this._speed = this.parked ? 0 : this.chassis.speed * 60
-    // Settled upside down = dead. The head-contact crash only fires on a NEW
-    // collision while pitched past the gate; a wreck that slides into an
-    // inverted rest keeps its old contact and never re-triggers, leaving the
-    // rider planted head-first forever. A short timer catches that state.
-    if (this.ctx.state.phase === 'playing' && this.grounded && this.tilt() > 2.4) {
+    // Settled upside down = dead. `grounded` is wheels-only and an inverted
+    // bike has its wheels in the air, so the timer counts on ANY body contact
+    // (wheel, chassis or head) while pitched past ~137 deg.
+    const touching = this.grounded || this.headContacts > 0 || this.chassisContacts > 0
+    if (this.ctx.state.phase === 'playing' && touching && this.tilt() > 2.4) {
       this.invertedMs += STEP
       if (this.invertedMs > 900) this.crashed = true
     } else {
       this.invertedMs = 0
     }
     this._rpm = Math.min(Math.abs(this.wheelBack.angularVelocity) / MAX_WHEEL_AV, 1)
-    if (this.headHit) {
-      // Only a real wipeout kills: head contact while the bike is pitched past
-      // ~52 deg. A nose-down landing that grazes the helmet is a scrape, not a
-      // crash — instant deaths on ordinary jumps read as unfair.
-      const a2p = this.chassis.angle % (Math.PI * 2)
-      const norm = a2p > Math.PI ? a2p - Math.PI * 2 : a2p < -Math.PI ? a2p + Math.PI * 2 : a2p
-      if (Math.abs(norm) > 0.9) {
-        this.crashed = true
-      } else {
-        this.headHit = false
-        this.addShake(2)
-      }
+    // Only a real wipeout kills: head ON the ground while the bike is pitched
+    // past ~52 deg. Level-triggered on the live contact count — the old edge
+    // flag (new collision only) let a helmet that grazed at a shallow angle
+    // stay in contact while the bike rotated fully inverted and never die.
+    // A nose-down landing that grazes the helmet is a scrape, not a crash.
+    if (this.headContacts > 0 && this.tilt() > 0.9) {
+      this.crashed = true
+    } else if (this.headHit) {
+      this.headHit = false
+      this.addShake(2)
     }
     // keep the read-only view (hud + debug handle) live
     const v = this.bikeView
