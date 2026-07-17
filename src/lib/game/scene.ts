@@ -354,14 +354,38 @@ export class OrnnScene extends Phaser.Scene {
     this.load.image('flag', '/assets/px/flag.png')
   }
 
-  create(): void {
-    // The bike/rider sprites live at a non-integer scale (world 1.13 × camera
-    // zoom), so global NEAREST filtering makes their pixels crawl in motion —
-    // which reads as blur under acceleration. LINEAR keeps their edges stable;
-    // coins/flag stay NEAREST (they sit still, crawl never shows).
-    for (const key of ['bike', 'rider', 'ragdoll', 'wheel']) {
-      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR)
+  // Bake `key` upscaled by the nearest integer to worldScale×DPR (nearest-
+  // neighbour, so pixels stay hard), returning the baked key plus the sprite
+  // scale that keeps world-space size identical. LINEAR filtering then only
+  // covers the fractional remainder, softening edges by <1 physical px.
+  private crisp(key: string, worldScale: number): { key: string; scale: number } {
+    const k = Math.max(1, Math.round(worldScale * DPR))
+    const baked = `${key}-x${k}`
+    if (!this.textures.exists(baked)) {
+      const src = this.textures.get(key).getSourceImage() as HTMLImageElement
+      const cv = document.createElement('canvas')
+      cv.width = src.width * k
+      cv.height = src.height * k
+      const c2 = cv.getContext('2d')!
+      c2.imageSmoothingEnabled = false
+      c2.drawImage(src, 0, 0, cv.width, cv.height)
+      this.textures.addCanvas(baked, cv)
+      this.textures.get(baked).setFilter(Phaser.Textures.FilterMode.LINEAR)
     }
+    return { key: baked, scale: worldScale / k }
+  }
+
+  create(): void {
+    // The bike/rider sprites live at a non-integer physical scale (world
+    // ~1.1-1.5 × DPR), so plain NEAREST makes pixels crawl in motion and plain
+    // LINEAR smears the whole sprite (the "driving blur"). Instead: bake each
+    // texture once at the nearest integer upscale with nearest-neighbour, then
+    // LINEAR only bridges the small fractional remainder (~1.1×) — crisp
+    // pixels, stable edges. Coins/flag stay NEAREST (they sit still).
+    const bike = this.crisp('bike', BIKE_SCALE)
+    const rider = this.crisp('rider', 103 / 88)
+    const ragdoll = this.crisp('ragdoll', 100 / 66)
+    const wheel = this.crisp('wheel', 44 / 32)
 
     this.cameras.main.setBackgroundColor(CN.bg0)
 
@@ -372,13 +396,13 @@ export class OrnnScene extends Phaser.Scene {
     this.worldGfx = this.add.graphics().setDepth(0)
 
     // Bike sprites — created hidden, positioned once the world is built.
-    this.wheelBackSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 32).setVisible(false)
-    this.wheelFrontSprite = this.add.image(0, 0, 'wheel').setDepth(5).setScale(44 / 32).setVisible(false)
-    this.bikeSprite = this.add.image(0, 0, 'bike').setDepth(6).setOrigin(BIKE_ORIGIN_X, BIKE_ORIGIN_Y).setScale(BIKE_SCALE).setVisible(false)
+    this.wheelBackSprite = this.add.image(0, 0, wheel.key).setDepth(5).setScale(wheel.scale).setVisible(false)
+    this.wheelFrontSprite = this.add.image(0, 0, wheel.key).setDepth(5).setScale(wheel.scale).setVisible(false)
+    this.bikeSprite = this.add.image(0, 0, bike.key).setDepth(6).setOrigin(BIKE_ORIGIN_X, BIKE_ORIGIN_Y).setScale(bike.scale).setVisible(false)
     // Rider sits on the bike: origin at his hips, scaled so his torso doesn't
     // tower over the handlebars. Seat offset is derived in syncSprites().
-    this.riderSprite = this.add.image(0, 0, 'rider').setDepth(7).setOrigin(0.5, 0.66).setScale(103 / 88).setVisible(false)
-    this.ragdollSprite = this.add.image(0, 0, 'ragdoll').setDepth(7).setOrigin(0.5, 0.5).setScale(100 / 66).setVisible(false)
+    this.riderSprite = this.add.image(0, 0, rider.key).setDepth(7).setOrigin(0.5, 0.66).setScale(rider.scale).setVisible(false)
+    this.ragdollSprite = this.add.image(0, 0, ragdoll.key).setDepth(7).setOrigin(0.5, 0.5).setScale(ragdoll.scale).setVisible(false)
 
     this.chromeGfx = this.add.graphics().setScrollFactor(0).setDepth(20)
 

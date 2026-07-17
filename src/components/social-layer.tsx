@@ -25,9 +25,9 @@ const CATS: { id: TrackCategory; label: string }[] = [
 // Pixel-theme building blocks matching the game HUD (square, 2px border, hard shadow).
 const panel = "border-2 border-[#262626] bg-[#0c0c0c] shadow-[4px_4px_0_rgba(0,0,0,0.65)]";
 const btn =
-  "pointer-events-auto cursor-pointer border-2 border-[#262626] bg-[#0c0c0c] px-3 py-1.5 " +
-  "text-[11px] font-semibold tracking-[0.12em] text-[#909090] transition-colors " +
-  "hover:text-[#c8c8c8] max-sm:px-2 max-sm:py-1 max-sm:text-[9px]";
+  "pointer-events-auto flex h-[34px] cursor-pointer items-center border-2 border-[#262626] " +
+  "bg-[#0c0c0c] px-3 text-[11px] font-semibold tracking-[0.12em] text-[#909090] " +
+  "transition-colors hover:text-[#c8c8c8] max-sm:h-[26px] max-sm:px-2 max-sm:text-[9px]";
 
 function loadPendingRun(): RunResult | null {
   try {
@@ -104,6 +104,15 @@ export function SocialLayer({
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Mono',ui-monospace,monospace]">
       {/* top-right: repo + leaderboard + auth */}
       <div className="absolute top-[18px] right-6 flex items-center gap-2 max-sm:top-2 max-sm:right-2 max-sm:gap-1">
+        <a
+          href="https://ornn.com"
+          target="_blank"
+          rel="noreferrer"
+          className={`${btn} max-sm:hidden`}
+          title="market data by ornn"
+        >
+          DATA · ORNN.COM
+        </a>
         <a
           href="https://github.com/ayush-that/ornn-rider"
           target="_blank"

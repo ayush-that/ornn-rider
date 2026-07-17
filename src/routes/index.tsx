@@ -109,7 +109,15 @@ function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderbo
         Your girlfriend needs GPU clusters for her AI startup — and compute is not
         cheap. Be the engineer boyfriend: ride the live markets, collect chips, and
         secure the compute. Every hill is a real chart — GPU rentals, DRAM spot
-        prices, and LLM token indices, full history.
+        prices, and LLM token indices, full history.{" "}
+        <a
+          href="https://ornn.com"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#34d97b] hover:underline"
+        >
+          Data by ornn.com
+        </a>
       </p>
       <div className="flex flex-col items-center gap-3">
         <button
