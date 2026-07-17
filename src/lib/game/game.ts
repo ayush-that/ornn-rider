@@ -38,7 +38,7 @@ function loadBest(): Record<string, number> {
 
 function loadLast(): { track: Track; range: GpuRange } {
   let trackId = 'h100'
-  // Deep link wins: /?track=<id> (e.g. ?track=mem-nand, ?track=tok-anthropic)
+  // Deep link wins: /?track=<id> (e.g. ?track=mem-ddr5, ?track=tok-anthropic)
   // lands straight on that track; localStorage is the fallback.
   try {
     const urlTrack = new URLSearchParams(location.search).get('track')

@@ -21,7 +21,6 @@ export const COMPUTE_TRACKS: Track[] = [
 export const MEMORY_TRACKS: Track[] = [
   { id: 'mem-ddr5', category: 'memory', apiId: 'DDR5 16Gb (2Gx8) 4800/5600', tab: 'DDR5', label: 'DDR5 16Gb 4800/5600' },
   { id: 'mem-ddr4', category: 'memory', apiId: 'DDR4 16Gb (2Gx8) 3200', tab: 'DDR4', label: 'DDR4 16Gb 3200' },
-  { id: 'mem-nand', category: 'memory', apiId: 'MLC 64Gb 8GBx8', tab: 'NAND', label: 'MLC 64Gb NAND Flash' },
   { id: 'mem-rdimm', category: 'memory', apiId: 'DDR5 RDIMM 32GB 4800/5600', tab: 'RDIMM', label: 'DDR5 RDIMM 32GB' },
 ]
 

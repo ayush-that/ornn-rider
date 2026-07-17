@@ -134,10 +134,11 @@ const CSS = `
 .oh-btn {
   flex: 1; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 1.3;
   padding: 11px 0; border-radius: 0; cursor: pointer; border: 2px solid transparent; transition: filter .12s;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.7);
 }
 .oh-btn:hover { filter: brightness(1.25); }
-.oh-btn.primary { background: ${C.text}; color: ${C.chipText}; box-shadow: 3px 3px 0 rgba(0,0,0,0.7); }
-.oh-btn.ghost { background: #1c1c1c; color: ${C.dim}; border-color: #2a2a2a; }
+.oh-btn.primary { background: ${C.text}; color: ${C.chipText}; }
+.oh-btn.ghost { background: #14161b; color: ${C.dim}; border-color: #3a4049; }
 
 /* ---- loading ---- */
 #oh-loading {
