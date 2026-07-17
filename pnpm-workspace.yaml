@@ -3,9 +3,11 @@ allowBuilds:
   sharp: false
   workerd: true
 
-# https://pnpm.io/settings#minimumreleaseage
-# https://pnpm.io/supply-chain-security#delay-dependency-updates
 minimumReleaseAge: 1440
+
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - semver@6.3.1
 
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.4

@@ -33,8 +33,16 @@ export function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onL
         >
           LEADERBOARD
         </button>
-        <p className="mt-2 font-['Space_Mono',ui-monospace,monospace] text-[11px] tracking-[0.06em] text-[#5a5a5a]">
-          data sourced from ornn.com
+        <p className="pointer-events-auto mt-2 font-['Space_Mono',ui-monospace,monospace] text-[11px] tracking-[0.06em] text-[#5a5a5a]">
+          data sourced from{" "}
+          <a
+            href="https://ornn.com"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-[#909090]"
+          >
+            ornn.com
+          </a>
         </p>
       </div>
     </div>

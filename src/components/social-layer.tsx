@@ -103,11 +103,6 @@ export function SocialLayer({
     void signIn("twitter");
   }
 
-  // Signed out only: once you've died with a real run banked, keep the sign-in
-  // nudge up — it's the only path onto the leaderboard. Signed-in runs post
-  // silently, no confirmation chip.
-  const showRunChip = lastRun !== null && lastRun.distance > 0 && !authLoading && !signedIn;
-
   return (
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Mono',ui-monospace,monospace]">
       {/* top-right: repo + leaderboard + auth */}
@@ -149,20 +144,6 @@ export function SocialLayer({
           </button>
         )}
       </div>
-
-      {/* run-end chip: sign-in nudge for signed-out riders */}
-      {showRunChip ? (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
-          <button
-            type="button"
-            className={`${btn} flex items-center gap-2 text-[#e8e8e8]`}
-            onClick={signInWithX}
-          >
-            <SiX size={12} />
-            SIGN IN WITH X TO POST YOUR SCORE
-          </button>
-        </div>
-      ) : null}
 
       {boardOpen ? (
         <Leaderboard initialCategory={lastRun?.category ?? "compute"} onClose={() => setBoardOpen(false)} />

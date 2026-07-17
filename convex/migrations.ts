@@ -7,14 +7,9 @@ export const clearPrototypeScores = internalMutation({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("scores").collect();
-    let deleted = 0;
-    for (const row of rows) {
-      if (row.anonName !== undefined || row.userId === undefined) {
-        await ctx.db.delete(row._id);
-        deleted += 1;
-      }
-    }
-    return deleted;
+    const stale = rows.filter((row) => row.anonName !== undefined || row.userId === undefined);
+    await Promise.all(stale.map((row) => ctx.db.delete(row._id)));
+    return stale.length;
   },
 });
 
@@ -23,16 +18,16 @@ export const backfillScoreCategories = internalMutation({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("scores").collect();
-    let patched = 0;
+    const patches: Promise<void>[] = [];
     for (const row of rows) {
       if (row.category) continue;
       const prefix = row.trackId.split(":")[0];
       const category =
         prefix === "gpu" ? "compute" : prefix === "mem" ? "memory" : prefix === "tok" ? "tokens" : null;
       if (!category) continue;
-      await ctx.db.patch(row._id, { category });
-      patched += 1;
+      patches.push(ctx.db.patch(row._id, { category }));
     }
-    return patched;
+    await Promise.all(patches);
+    return patches.length;
   },
 });
