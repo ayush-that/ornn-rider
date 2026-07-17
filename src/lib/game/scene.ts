@@ -334,6 +334,17 @@ export class OrnnScene extends Phaser.Scene {
   // fixed-timestep accumulator
   private acc = 0
 
+  // Pose at the previous physics step, for render interpolation. On
+  // high-refresh displays the camera pans every rendered frame while physics
+  // steps at 60Hz; without interpolation the bike stair-steps relative to the
+  // scrolling world and reads as a doubled image at speed.
+  private prevPose = {
+    cx: 0, cy: 0, ca: 0, // chassis
+    bx: 0, by: 0, ba: 0, // back wheel
+    fx: 0, fy: 0, fa: 0, // front wheel
+    rx: 0, ry: 0, ra: 0, // ragdoll
+  }
+
 
   // camera shake (ported from effects.ts)
   private shakeMag = 0
@@ -537,6 +548,7 @@ export class OrnnScene extends Phaser.Scene {
 
     this.ctx.state.bike = this.bikeView
     this.resetRunState(sx)
+    this.snapPose()
     this.built = true
     this.ctx.state.phase = 'playing'
   }
@@ -828,6 +840,7 @@ export class OrnnScene extends Phaser.Scene {
     this.riderSprite.setVisible(true)
     this.ragdollSprite.setVisible(false)
     this.updateCollider(rx)
+    this.snapPose() // teleport: don't interpolate across the jump
   }
 
   // ---- bike control (ported tuning) -------------------------------------
@@ -878,7 +891,16 @@ export class OrnnScene extends Phaser.Scene {
     this.presentation(dt)
   }
 
+  private snapPose(): void {
+    const P = this.prevPose
+    P.cx = this.chassis.position.x; P.cy = this.chassis.position.y; P.ca = this.chassis.angle
+    P.bx = this.wheelBack.position.x; P.by = this.wheelBack.position.y; P.ba = this.wheelBack.angle
+    P.fx = this.wheelFront.position.x; P.fy = this.wheelFront.position.y; P.fa = this.wheelFront.angle
+    if (this.ragdoll) { P.rx = this.ragdoll.position.x; P.ry = this.ragdoll.position.y; P.ra = this.ragdoll.angle }
+  }
+
   private physicsStep(): void {
+    this.snapPose()
     const state = this.ctx.state
     const chassis = this.chassis
     const bx = chassis.position.x
@@ -1370,6 +1392,8 @@ export class OrnnScene extends Phaser.Scene {
     B.setAngularVelocity(body, 0.35 + Math.random() * 0.25)
     this.matter.world.add(body)
     this.ragdoll = body
+    const P = this.prevPose
+    P.rx = body.position.x; P.ry = body.position.y; P.ra = body.angle
 
     this.riderSprite.setVisible(false)
     this.ragdollSprite.setVisible(true)
@@ -1526,12 +1550,26 @@ export class OrnnScene extends Phaser.Scene {
   }
 
   private syncSprites(): void {
-    this.wheelBackSprite.setPosition(this.wheelBack.position.x, this.wheelBack.position.y).setRotation(this.wheelBack.angle)
-    this.wheelFrontSprite.setPosition(this.wheelFront.position.x, this.wheelFront.position.y).setRotation(this.wheelFront.angle)
-    const a = this.chassis.angle
-    this.bikeSprite.setPosition(this.chassis.position.x, this.chassis.position.y).setRotation(a)
+    // Blend between the previous and current physics pose by how far the
+    // accumulator sits into the next step, so sprites move every rendered
+    // frame even when no physics step ran this frame (120Hz+ displays).
+    const P = this.prevPose
+    const t = Math.min(this.acc / STEP, 1)
+    const lerp = (a: number, b: number) => a + (b - a) * t
+    this.wheelBackSprite
+      .setPosition(lerp(P.bx, this.wheelBack.position.x), lerp(P.by, this.wheelBack.position.y))
+      .setRotation(lerp(P.ba, this.wheelBack.angle))
+    this.wheelFrontSprite
+      .setPosition(lerp(P.fx, this.wheelFront.position.x), lerp(P.fy, this.wheelFront.position.y))
+      .setRotation(lerp(P.fa, this.wheelFront.angle))
+    const a = lerp(P.ca, this.chassis.angle)
+    const cx = lerp(P.cx, this.chassis.position.x)
+    const cy = lerp(P.cy, this.chassis.position.y)
+    this.bikeSprite.setPosition(cx, cy).setRotation(a)
     if (this.bikeView.ejected && this.ragdoll) {
-      this.ragdollSprite.setPosition(this.ragdoll.position.x, this.ragdoll.position.y).setRotation(this.ragdoll.angle)
+      this.ragdollSprite
+        .setPosition(lerp(P.rx, this.ragdoll.position.x), lerp(P.ry, this.ragdoll.position.y))
+        .setRotation(lerp(P.ra, this.ragdoll.angle))
     } else {
       // Rider rigidly mounted on the seat. The offset is the seat pixel
       // (~208,74) in bike-solo.png mapped through the same scale/origin as the
@@ -1543,8 +1581,8 @@ export class OrnnScene extends Phaser.Scene {
       // he never reads as hovering, verified by offline composite at 0/-0.6rad.
       const ox = (51 - 63) * BIKE_SCALE
       const oy = (23 - BIKE_ORIGIN_Y * BIKE_SPRITE_H) * BIKE_SCALE + 6
-      const rx = this.chassis.position.x + Math.cos(a) * ox - Math.sin(a) * oy
-      const ry = this.chassis.position.y + Math.sin(a) * ox + Math.cos(a) * oy
+      const rx = cx + Math.cos(a) * ox - Math.sin(a) * oy
+      const ry = cy + Math.sin(a) * ox + Math.cos(a) * oy
       this.riderSprite.setPosition(rx, ry).setRotation(a)
     }
     // coin bob (visible ones near the camera)
