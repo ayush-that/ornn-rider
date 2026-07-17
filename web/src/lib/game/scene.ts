@@ -86,10 +86,10 @@ const SPAWN_DY = 60
 // --- Nitro tuning ----------------------------------------------------------
 // Scarce by design: a full tank lasts ~1.8s and refills slowly, so sustained
 // boost is impossible even while hoovering up coins at speed.
-const NITRO_DRAIN = 0.55 // per second while active
-const NITRO_TRICKLE = 0.02 // per second, always
-const NITRO_PER_COIN = 0.04
-const NITRO_PER_FLIP = 0.2
+const NITRO_DRAIN = 0.4 // per second while active (~2.5s full tank)
+const NITRO_TRICKLE = 0.05 // per second, always
+const NITRO_PER_COIN = 0.08
+const NITRO_PER_FLIP = 0.35
 const NITRO_ARM = 0.10 // min charge to (re)start a boost — hysteresis vs empty-tank stutter
 const NITRO_FORCE = 0.0038 // ~4x the peak trend-wind force per step
 
@@ -669,10 +669,10 @@ export class OrnnScene extends Phaser.Scene {
     for (let i = 0; i < markers.length; i++) {
       const r = rand()
       let value = 0
-      if (r >= 0.98) value = -1 // nitro canister
-      else if (r >= 0.93) value = 50
-      else if (r >= 0.8) value = 20
-      else if (r >= 0.55) value = 5
+      if (r >= 0.95) value = -1 // nitro canister (~5% of markers)
+      else if (r >= 0.9) value = 50
+      else if (r >= 0.78) value = 20
+      else if (r >= 0.52) value = 5
       this.pickupValue[i] = value
       if (value === 0) {
         this.coinSprites.push(null)
@@ -1118,8 +1118,8 @@ export class OrnnScene extends Phaser.Scene {
         if (value === 0) { collected[j] = 1; continue }
         collected[j] = 1
         if (value === -1) {
-          // nitro canister: half a tank, even mid-boost
-          state.nitro = clamp(state.nitro + 0.5, 0, 1)
+          // nitro canister: full tank, even mid-boost
+          state.nitro = 1
           this.popup(m.x, m.y - 56, 'NITRO', 0x5ad1ff)
           if (!this.ctx.isMuted()) this.ctx.audio.canister()
         } else {
