@@ -1430,7 +1430,12 @@ export class OrnnScene extends Phaser.Scene {
         if (h > 80) targetZoom -= Math.min((h - 80) / 900, 1) * 0.2
       }
     }
-    state.camera.x += (tx - state.camera.x) * 0.08
+    // Tight horizontal follow: with a loose lerp the bike slides across the
+    // screen while accelerating, and anything moving across the display smears
+    // (reads as motion blur). Locking x keeps the bike screen-stationary — the
+    // terrain streaks instead, which is what speed should look like. Vertical
+    // stays soft so bumps and jumps don't yank the view.
+    state.camera.x += (tx - state.camera.x) * 0.55
     state.camera.y += (ty - state.camera.y) * 0.08
     const zoomRate = targetZoom < state.camera.zoom ? 0.09 : 0.028
     state.camera.zoom += (targetZoom - state.camera.zoom) * zoomRate
