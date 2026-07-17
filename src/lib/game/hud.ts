@@ -129,7 +129,8 @@ const CSS = `
 .oh-rescell .oh-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim}; line-height: 1.3; }
 .oh-rescell .oh-v { font-size: 18px; font-weight: 600; margin-top: 5px; line-height: 1.25; }
 .oh-newbest { font-size: 11px; color: ${C.amber}; letter-spacing: 0.12em; margin-bottom: 14px; min-height: 15px; line-height: 1.3; }
-.oh-btnrow { display: flex; gap: 10px; margin-top: 14px; }
+/* padding, not margin: the #ornn-hud * reset nukes margins at ID specificity */
+.oh-btnrow { display: flex; gap: 10px; padding-top: 26px; }
 .oh-btn {
   flex: 1; font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; line-height: 1.3;
   padding: 11px 0; border-radius: 0; cursor: pointer; border: 2px solid transparent; transition: filter .12s;
@@ -420,8 +421,17 @@ export function createHud(
         <div class="oh-rescell"><div class="oh-k">Flips</div><div class="oh-v oh-mono">${state.flips}</div></div>
         <div class="oh-rescell"><div class="oh-k">Air time</div><div class="oh-v oh-mono">${(state.airTimeMs / 1000).toFixed(1)}s</div></div>
       </div>
-      <div class="oh-btnrow"><button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Play Again'}</button></div>`
-    card.querySelector<HTMLButtonElement>('.oh-btn')!.addEventListener('click', onRetry)
+      <div class="oh-btnrow">
+        <button type="button" class="oh-btn primary">${state.phase === 'crashed' ? 'Resume (R)' : 'Play Again'}</button>
+        <button type="button" class="oh-btn ghost">Main Menu</button>
+      </div>`
+    card.querySelector<HTMLButtonElement>('.oh-btn.primary')!.addEventListener('click', onRetry)
+    card.querySelector<HTMLButtonElement>('.oh-btn.ghost')!.addEventListener('click', () => {
+      // back to the start page: drop the ?track deep link and reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('track')
+      window.location.href = url.toString()
+    })
     results.appendChild(card)
     results.classList.remove('oh-hidden')
   }
