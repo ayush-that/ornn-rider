@@ -46,6 +46,17 @@ export function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onL
             ornn.com
           </a>
         </p>
+        <p className="pointer-events-auto font-['Space_Mono',ui-monospace,monospace] text-[11px] tracking-[0.06em] text-[#5a5a5a]">
+          inspired by{" "}
+          <a
+            href="https://stonkrider.com"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-[#909090]"
+          >
+            stonkrider.com
+          </a>
+        </p>
         </div>
       </div>
     </div>
