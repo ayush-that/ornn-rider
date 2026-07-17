@@ -109,12 +109,12 @@ export interface GameState {
 // Palette — Ornn live-chart theme: pure black, white price line, chart-paper
 // grid. Green/amber/red are reserved for the change chip and bull/bear effects.
 export const C = {
-  bg0: '#050505', // pure black page
-  bg1: '#080808',
-  panel: '#1c1c1c', // tooltip / results card
-  grid: '#161616', // fine chart-paper grid lines
-  gridBright: '#1e1e1e', // day-boundary verticals
-  line: '#161616', // legacy alias (borders)
+  bg0: '#171a20', // dark slate sky, lifted from pure black so the rider reads
+  bg1: '#1b1e24',
+  panel: '#24272d', // tooltip / results card
+  grid: '#262a31', // fine chart-paper grid lines
+  gridBright: '#2f343c', // day-boundary verticals
+  line: '#262a31', // legacy alias (borders)
   chart: '#f5f5f5', // the price line the bike rides
   text: '#ffffff',
   dim: '#8a8a8a',
@@ -134,16 +134,16 @@ export const C = {
 
 // Numeric mirrors of the palette for Phaser (which takes 0xRRGGBB ints).
 export const CN = {
-  bg0: 0x050505,
-  panel: 0x1c1c1c,
-  grid: 0x161616,
-  gridBright: 0x1e1e1e,
+  bg0: 0x171a20,
+  panel: 0x24272d,
+  grid: 0x262a31,
+  gridBright: 0x2f343c,
   chart: 0xf5f5f5,
   text: 0xffffff,
   dim: 0x8a8a8a,
   axis: 0x6a6a6a,
   chipBg: 0xffffff,
-  depth: 0x0a0a0a, // faint terrain depth fill
+  depth: 0x1e2126, // faint terrain depth fill
   green: 0x34d97b,
   greenDim: 0x1d7a4a,
   greenBright: 0x7ff0ad,

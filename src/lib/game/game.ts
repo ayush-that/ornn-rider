@@ -198,7 +198,7 @@ export function startGame(
   const game = new Phaser.Game({
     type: Phaser.WEBGL,
     canvas,
-    backgroundColor: '#050505',
+    backgroundColor: '#171a20',
     // Physical-resolution canvas (CSS stretches it back down): without this the
     // backing store is CSS-sized and the browser upscales the frame — soft
     // everywhere, obvious at speed. Scale.NONE + our own resize keeps control.
