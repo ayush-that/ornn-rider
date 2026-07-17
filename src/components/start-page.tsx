@@ -15,8 +15,7 @@ export function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onL
       <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Mono',ui-monospace,monospace] text-[13px] leading-relaxed text-[#909090]">
         Your girlfriend needs GPU clusters for her AI startup — and compute is not
         cheap. Be the engineer boyfriend: ride the live markets, collect chips, and
-        secure the compute. Every hill is a real chart — GPU rentals, DRAM spot
-        prices, and LLM token indices, full history.
+        secure the compute.
       </p>
       <div className="flex flex-col items-center gap-3">
         <button
