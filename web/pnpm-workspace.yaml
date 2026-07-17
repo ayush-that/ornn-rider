@@ -1,5 +1,7 @@
 allowBuilds:
   esbuild: true
+  sharp: false
+  workerd: true
 
 # https://pnpm.io/settings#minimumreleaseage
 # https://pnpm.io/supply-chain-security#delay-dependency-updates

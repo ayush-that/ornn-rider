@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ornn-rider",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".output/public"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Secrets (set once with `npx wrangler secret put <NAME>`):
+  //   ORNN_API_KEY — injected server-side by the /api proxy route
+}
