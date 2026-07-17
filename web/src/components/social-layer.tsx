@@ -97,7 +97,11 @@ export function SocialLayer({ lastRun }: { lastRun: RunResult | null }) {
     return () => clearInterval(id);
   }, []);
 
-  const showRunChip = lastRun !== null && lastRun.distance > 0 && !authLoading && onResults;
+  // Signed in: brief confirmation on the results screen only (crashes auto-
+  // resume). Signed out: once you've died with a real run banked, keep the
+  // sign-in nudge up — it's the only path onto the leaderboard.
+  const showRunChip =
+    lastRun !== null && lastRun.distance > 0 && !authLoading && (onResults || !signedIn);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">

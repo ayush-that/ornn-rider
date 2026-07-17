@@ -242,11 +242,19 @@ export function startGame(
         }
       } else if (e.code === 'KeyM') {
         muted = !muted
+        audio.setMusic(!muted)
       }
     }
     if (PREVENT.has(e.code)) e.preventDefault()
   }, listen)
   window.addEventListener('keyup', (e) => keys.delete(e.code), listen)
+  // Background music starts on the first gesture (AudioContext unlock) and
+  // follows the mute toggle from then on.
+  const startMusic = (): void => {
+    if (!muted) audio.setMusic(true)
+  }
+  window.addEventListener('keydown', startMusic, { once: true, signal: ac.signal })
+  window.addEventListener('pointerdown', startMusic, { once: true, signal: ac.signal })
   const clearInput = (): void => { keys.clear(); touch.throttle = false; touch.brake = false; touch.nitro = false }
   window.addEventListener('blur', clearInput, listen)
 
@@ -263,6 +271,7 @@ export function startGame(
 
   activeStop = () => {
     ac.abort()
+    audio.setMusic(false)
     game.destroy(false, false) // keep the React-owned canvas element
     root.replaceChildren()
     document.getElementById('ornn-hud-style')?.remove()
