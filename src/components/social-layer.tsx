@@ -27,7 +27,7 @@ const panel = "border-2 border-[#262626] bg-[#0c0c0c] shadow-[4px_4px_0_rgba(0,0
 const btn =
   "pointer-events-auto cursor-pointer border-2 border-[#262626] bg-[#0c0c0c] px-3 py-1.5 " +
   "text-[11px] font-semibold tracking-[0.12em] text-[#909090] transition-colors " +
-  "hover:text-[#c8c8c8]";
+  "hover:text-[#c8c8c8] max-sm:px-2 max-sm:py-1 max-sm:text-[9px]";
 
 function loadPendingRun(): RunResult | null {
   try {
@@ -117,7 +117,7 @@ export function SocialLayer({
   return (
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">
       {/* top-right: repo + leaderboard + auth */}
-      <div className="absolute top-[18px] right-6 flex items-center gap-2">
+      <div className="absolute top-[18px] right-6 flex items-center gap-2 max-sm:top-2 max-sm:right-2 max-sm:gap-1">
         <a
           href="https://github.com/ayush-that/ornn-rider"
           target="_blank"
@@ -156,29 +156,16 @@ export function SocialLayer({
         )}
       </div>
 
-      {/* run-end chip: post status or sign-in nudge */}
-      {showRunChip ? (
+      {/* run-end chip: post status */}
+      {showRunChip && signedIn && (posted === lastRun || submittedRef.current === lastRun) ? (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
-          {signedIn ? (
-            posted === lastRun || submittedRef.current === lastRun ? (
-              <button
-                type="button"
-                className={`${btn} text-[#34d97b]`}
-                onClick={() => setBoardOpen(true)}
-              >
-                SCORE POSTED — VIEW LEADERBOARD
-              </button>
-            ) : null
-          ) : (
-            <button
-              type="button"
-              className={`${btn} flex items-center gap-2 text-[#e8e8e8]`}
-              onClick={signInWithX}
-            >
-              <SiX size={12} />
-              SIGN IN WITH X TO POST YOUR SCORE
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${btn} text-[#34d97b]`}
+            onClick={() => setBoardOpen(true)}
+          >
+            SCORE POSTED — VIEW LEADERBOARD
+          </button>
         </div>
       ) : null}
 

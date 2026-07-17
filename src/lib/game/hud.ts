@@ -145,6 +145,32 @@ const CSS = `
   animation: oh-pulse 0.9s steps(2, end) infinite;
 }
 @keyframes oh-pulse { 0%,100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+/* ---- mobile ---- */
+@media (max-width: 700px) {
+  #oh-header { padding: 10px 10px 6px; }
+  #oh-cats { margin-bottom: 6px; gap: 5px; }
+  .oh-cat { font-size: 10px; padding: 5px 8px; }
+  #oh-tabs { gap: 5px; max-width: none; }
+  .oh-tab { font-size: 10px; padding: 5px 8px; }
+  #oh-priceblock { margin-top: 8px; gap: 8px; }
+  #oh-price { font-size: 20px; }
+  #oh-price .oh-hr { font-size: 11px; margin-left: 4px; }
+  #oh-datetime { margin-top: 3px; font-size: 10px; }
+  #oh-stats { left: 8px; bottom: 10px; gap: 5px; }
+  #oh-stats .oh-stat { padding: 5px 8px; }
+  #oh-stats .oh-k { font-size: 8px; }
+  #oh-stats .oh-v { font-size: 12px; }
+  #oh-speed { right: 8px; bottom: 10px; padding: 5px 8px; }
+  #oh-speed .oh-k { font-size: 8px; }
+  #oh-speed .oh-v { font-size: 13px; }
+  #oh-nitro { right: 8px; bottom: 58px; width: 90px; }
+  #oh-nitrobtn { right: 8px; bottom: 92px; width: 54px; height: 54px; }
+  #oh-hint { display: none; }
+  .oh-rescard { width: 300px; padding: 16px 18px; }
+  .oh-resgrid { gap: 6px; }
+  .oh-rescell { padding: 8px 10px; }
+}
 `
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, html?: string): HTMLElementTagNameMap[K] {
