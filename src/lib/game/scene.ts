@@ -863,9 +863,13 @@ export class OrnnScene extends Phaser.Scene {
   private throttle(dir: -1 | 0 | 1): void {
     const B = this.matter.body
     if (dir === 1) {
-      B.setAngularVelocity(this.wheelBack, Math.min(this.wheelBack.angularVelocity + WHEEL_ACCEL, MAX_WHEEL_AV))
-      if (this.grounded && this.chassis.angularVelocity > -MAX_WHEELIE_AV) {
-        B.setAngularVelocity(this.chassis, this.chassis.angularVelocity - WHEELIE_TORQUE)
+      const av = this.wheelBack.angularVelocity
+      B.setAngularVelocity(this.wheelBack, Math.min(av + WHEEL_ACCEL, MAX_WHEEL_AV))
+      // Nose-up torque only while the rear wheel is still spooling up, so
+      // cruising on plain W keeps the nose level; wheelies come from A.
+      const spool = Math.max(0, 1 - av / MAX_WHEEL_AV)
+      if (spool > 0 && this.grounded && this.chassis.angularVelocity > -MAX_WHEELIE_AV) {
+        B.setAngularVelocity(this.chassis, this.chassis.angularVelocity - WHEELIE_TORQUE * spool)
       }
     } else if (dir === -1) {
       B.setAngularVelocity(this.wheelBack, approach(this.wheelBack.angularVelocity, REVERSE_TARGET_AV, BRAKE_DECEL))
