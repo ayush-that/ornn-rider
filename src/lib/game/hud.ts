@@ -53,7 +53,7 @@ const CSS = `
 .oh-tab.active { color: ${C.text}; font-weight: 600; border-color: ${C.text}; box-shadow: 3px 3px 0 rgba(0,0,0,0.65); }
 #oh-tabline { display: none; }
 
-#oh-priceblock { display: flex; align-items: center; gap: 14px; margin-top: 0; padding: 2px 0; }
+#oh-priceblock { display: flex; align-items: center; gap: 14px; margin-top: 20px; padding: 2px 0; }
 #oh-datetime { margin-top: 6px; font-size: 11px; color: #8a8a8a; letter-spacing: 0.05em; min-height: 14px; }
 #oh-price { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
 #oh-price .oh-hr { font-size: 14px; font-weight: 400; color: ${C.dim}; margin-left: 6px; }
@@ -157,7 +157,7 @@ const CSS = `
   .oh-cat { font-size: 10px; padding: 5px 8px; }
   #oh-tabs { gap: 5px; max-width: none; }
   .oh-tab { font-size: 10px; padding: 5px 8px; }
-  #oh-priceblock { margin-top: 0; gap: 8px; }
+  #oh-priceblock { margin-top: 8px; gap: 8px; }
   #oh-price { font-size: 20px; }
   #oh-price .oh-hr { font-size: 11px; margin-left: 4px; }
   #oh-datetime { margin-top: 3px; font-size: 10px; }
