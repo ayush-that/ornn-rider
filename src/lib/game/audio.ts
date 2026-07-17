@@ -380,10 +380,10 @@ export function createAudio(): Audio {
       const now = ctx.currentTime
       // Pitch scales with point value; a 50 gets a tiny three-note arpeggio.
       const base = value >= 50 ? 1047 : value >= 20 ? 784 : 587
-      tone(base, now, 0.09, 0.26, 'square')
+      tone(base, now, 0.09, 0.13, 'square')
       if (value >= 50) {
-        tone(base * 1.26, now + 0.06, 0.08, 0.24, 'square')
-        tone(base * 1.5, now + 0.12, 0.12, 0.24, 'square')
+        tone(base * 1.26, now + 0.06, 0.08, 0.12, 'square')
+        tone(base * 1.5, now + 0.12, 0.12, 0.12, 'square')
       }
     },
 
