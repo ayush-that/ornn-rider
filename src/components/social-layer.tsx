@@ -57,7 +57,6 @@ export function SocialLayer({
   useEffect(() => {
     if (boardSignal > 0) setBoardOpen(true);
   }, [boardSignal]);
-  const [posted, setPosted] = useState<RunResult | null>(null);
   const submittedRef = useRef<RunResult | null>(null);
 
   const signedIn = viewer !== undefined && viewer !== null;
@@ -80,7 +79,6 @@ export function SocialLayer({
       flips: run.flips,
       timeMs: run.timeMs,
     })
-      .then(() => setPosted(run))
       .catch(() => {
         submittedRef.current = null;
       });
@@ -97,22 +95,10 @@ export function SocialLayer({
     void signIn("twitter");
   }
 
-  // The chip belongs to the results screen; hide it once the player rides again
-  // (poll the game's debug handle — its shape is part of the game contract).
-  const [onResults, setOnResults] = useState(false);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const phase = (window as unknown as { __ornn?: { phase?: string } }).__ornn?.phase;
-      setOnResults(phase === "crashed" || phase === "finished");
-    }, 400);
-    return () => clearInterval(id);
-  }, []);
-
-  // Signed in: brief confirmation on the results screen only (crashes auto-
-  // resume). Signed out: once you've died with a real run banked, keep the
-  // sign-in nudge up — it's the only path onto the leaderboard.
-  const showRunChip =
-    lastRun !== null && lastRun.distance > 0 && !authLoading && (onResults || !signedIn);
+  // Signed out only: once you've died with a real run banked, keep the sign-in
+  // nudge up — it's the only path onto the leaderboard. Signed-in runs post
+  // silently, no confirmation chip.
+  const showRunChip = lastRun !== null && lastRun.distance > 0 && !authLoading && !signedIn;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Mono',ui-monospace,monospace]">
@@ -156,15 +142,16 @@ export function SocialLayer({
         )}
       </div>
 
-      {/* run-end chip: post status */}
-      {showRunChip && signedIn && (posted === lastRun || submittedRef.current === lastRun) ? (
+      {/* run-end chip: sign-in nudge for signed-out riders */}
+      {showRunChip ? (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
           <button
             type="button"
-            className={`${btn} text-[#34d97b]`}
-            onClick={() => setBoardOpen(true)}
+            className={`${btn} flex items-center gap-2 text-[#e8e8e8]`}
+            onClick={signInWithX}
           >
-            SCORE POSTED — VIEW LEADERBOARD
+            <SiX size={12} />
+            SIGN IN WITH X TO POST YOUR SCORE
           </button>
         </div>
       ) : null}
