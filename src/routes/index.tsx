@@ -94,7 +94,7 @@ function HomePage() {
 const startBtn =
   "pointer-events-auto cursor-pointer border-2 bg-[#0c0c0c] px-10 py-3 text-[13px] " +
   "font-bold tracking-[0.18em] shadow-[4px_4px_0_rgba(0,0,0,0.65)] transition-colors " +
-  "font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]";
+  "font-['Space_Mono',ui-monospace,monospace]";
 
 function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderboard: () => void }) {
   return (
@@ -105,7 +105,7 @@ function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderbo
         className="w-[min(420px,72vw)] select-none"
         draggable={false}
       />
-      <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif] text-[13px] leading-relaxed text-[#909090]">
+      <p className="pointer-events-auto max-w-[520px] px-6 text-center font-['Space_Mono',ui-monospace,monospace] text-[13px] leading-relaxed text-[#909090]">
         Your girlfriend needs GPU clusters for her AI startup — and compute is not
         cheap. Be the engineer boyfriend: ride the live markets, collect chips, and
         secure the compute. Every hill is a real chart — GPU rentals, DRAM spot
@@ -141,7 +141,7 @@ function TrackPicker({ onPick, onBack }: { onPick: (t: Track) => void; onBack: (
   const [cat, setCat] = useState<TrackCategory>("compute");
   const tracks = CATEGORIES.find((c) => c.id === cat)?.tracks ?? [];
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-[#050505] px-4 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 bg-[#050505] px-4 font-['Space_Mono',ui-monospace,monospace]">
       <div className="text-[13px] font-bold tracking-[0.2em] text-[#e8e8e8]">PICK YOUR MARKET</div>
       <div className="flex gap-2">
         {CAT_LABELS.map((c) => (

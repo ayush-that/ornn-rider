@@ -227,8 +227,8 @@ function pointIndex(pts: { x: number; y: number }[], x: number): number {
   return lo
 }
 
-const MONO = '"Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif'
-const SANS = '"Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif'
+const MONO = '"Space Mono", ui-monospace, monospace'
+const SANS = '"Space Mono", ui-monospace, monospace'
 
 export class OrnnScene extends Phaser.Scene {
   private ctx!: GameCtx

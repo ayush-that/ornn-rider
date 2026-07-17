@@ -13,7 +13,7 @@ const CSS = `
 #ornn-hud { padding: 0; }
 #ornn-hud {
   position: fixed; inset: 0; pointer-events: none; z-index: 10;
-  font-family: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'Space Mono', ui-monospace, monospace;
   color: ${C.text};
   line-height: 1.4; letter-spacing: 0.01em; word-spacing: 0.04em;
   -webkit-font-smoothing: antialiased;
@@ -106,7 +106,7 @@ const CSS = `
 #oh-nitrobtn.armed { border-color: ${C.amber}; filter: brightness(1.3); }
 @media (pointer: coarse) { #oh-nitrobtn { display: flex; } }
 #oh-hint {
-  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%);
   font-size: 12px; color: ${C.dim}; letter-spacing: 0.05em; line-height: 1.5;
   padding: 6px 12px; transition: opacity .3s; text-align: center;
 }

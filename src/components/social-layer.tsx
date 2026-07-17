@@ -115,7 +115,7 @@ export function SocialLayer({
     lastRun !== null && lastRun.distance > 0 && !authLoading && (onResults || !signedIn);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]">
+    <div className="pointer-events-none fixed inset-0 z-20 font-['Space_Mono',ui-monospace,monospace]">
       {/* top-right: repo + leaderboard + auth */}
       <div className="absolute top-[18px] right-6 flex items-center gap-2 max-sm:top-2 max-sm:right-2 max-sm:gap-1">
         <a
