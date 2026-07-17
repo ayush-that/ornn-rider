@@ -24,3 +24,4 @@ dist
 .tanstack
 .env.local
 .x-app-credentials.local
+.launch-video/
