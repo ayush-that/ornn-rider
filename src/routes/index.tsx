@@ -6,23 +6,31 @@ import type { RunResult } from "#/lib/game/types";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
+  // Deep links (?track=...) skip the start page straight into the game.
+  validateSearch: (search: Record<string, unknown>): { track?: string } =>
+    typeof search.track === "string" ? { track: search.track } : {},
   head: () => ({
     meta: [
-      { title: "Ornn Rider" },
+      { title: "Engineer Boyfriend — ride the AI market" },
       {
         name: "description",
-        content: "Ride the compute market — a bike over real GPU price charts.",
+        content:
+          "Hill-climb a dirt bike over real GPU, memory, and token price charts. Post your run to the leaderboard with X.",
       },
     ],
   }),
 });
 
 function HomePage() {
+  const { track } = Route.useSearch();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const uiRef = useRef<HTMLDivElement>(null);
   const [lastRun, setLastRun] = useState<RunResult | null>(null);
+  const [started, setStarted] = useState(track !== undefined);
+  const [boardSignal, setBoardSignal] = useState(0);
 
   useEffect(() => {
+    if (!started) return;
     const canvas = canvasRef.current;
     const root = uiRef.current;
     if (!canvas || !root) return;
@@ -46,7 +54,7 @@ function HomePage() {
       stop?.();
       document.body.style.overflow = prevOverflow;
     };
-  }, []);
+  }, [started]);
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#050505]">
@@ -58,7 +66,48 @@ function HomePage() {
       <div ref={uiRef} className="pointer-events-none fixed inset-0" />
 
       {/* React layer: X sign-in, score submission, leaderboards (Convex). */}
-      <SocialLayer lastRun={lastRun} />
+      <SocialLayer lastRun={lastRun} boardSignal={boardSignal} />
+
+      {started ? null : (
+        <StartPage
+          onStart={() => setStarted(true)}
+          onLeaderboard={() => setBoardSignal((n) => n + 1)}
+        />
+      )}
+    </div>
+  );
+}
+
+const startBtn =
+  "pointer-events-auto cursor-pointer border-2 bg-[#0c0c0c] px-10 py-3 text-[13px] " +
+  "font-bold tracking-[0.18em] shadow-[4px_4px_0_rgba(0,0,0,0.65)] transition-colors " +
+  "font-['Space_Grotesk_Variable',ui-sans-serif,system-ui,sans-serif]";
+
+function StartPage({ onStart, onLeaderboard }: { onStart: () => void; onLeaderboard: () => void }) {
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-8 bg-[#050505]">
+      <img
+        src="/logo.png"
+        alt="Engineer Boyfriend"
+        className="w-[min(420px,72vw)] select-none"
+        draggable={false}
+      />
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          className={`${startBtn} border-[#34d97b] text-[#34d97b] hover:bg-[#34d97b] hover:text-[#050505]`}
+          onClick={onStart}
+        >
+          START GAME
+        </button>
+        <button
+          type="button"
+          className={`${startBtn} border-[#262626] text-[#909090] hover:text-[#e8e8e8]`}
+          onClick={onLeaderboard}
+        >
+          LEADERBOARD
+        </button>
+      </div>
     </div>
   );
 }
